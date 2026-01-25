@@ -220,12 +220,12 @@ if st.session_state.df is not None:
                 filtered_df = filtered_df[filtered_df['월세_num'].between(rent_sel[0], rent_sel[1])]
 
         c3, c4 = st.columns(2)
-        if '전용면적' in raw_df.columns:
+        if '전용면적_num' in raw_df.columns:
             area_list = sorted(raw_df['전용면적_num'].unique())
             sel_areas = c3.multiselect("📐 전용면적 (㎡)", options=area_list, default=area_list)
             filtered_df = filtered_df[filtered_df['전용면적_num'].isin(sel_areas)]
 
-        if '층' in raw_df.columns:
+        if '층_num' in raw_df.columns:
             floor_list = sorted(raw_df['층_num'].unique().astype(int))
             sel_floors = c4.multiselect("🏢 층수 선택", options=floor_list, default=floor_list)
             filtered_df = filtered_df[filtered_df['층_num'].isin(sel_floors)]
@@ -252,7 +252,17 @@ if st.session_state.df is not None:
         
         # 가공용 컬럼 제거 후 최종 리스트 출력
         st.subheader("📋 실거래 내역 리스트")
-        disp_df = filtered_df.drop(columns=[c for c in filtered_df.columns if c.endswith('_num')])
+        
+        # 사용자 요청에 따라 특정 컬럼 및 road로 시작하는 컬럼 제외
+        fixed_exclude = ['index', 'sggCd', 'umdNm', '아파트', 'jibun', 'buildYear', 'aptSeq']
+        road_exclude = [c for c in filtered_df.columns if str(c).startswith('road')]
+        internal_exclude = [c for c in filtered_df.columns if str(c).endswith('_num')]
+        
+        all_drop_cols = list(set(fixed_exclude + road_exclude + internal_exclude))
+        actual_drop_cols = [c for c in all_drop_cols if c in filtered_df.columns]
+        
+        disp_df = filtered_df.drop(columns=actual_drop_cols)
+        
         st.dataframe(disp_df, use_container_width=True, height=550)
         
         # 다운로드 버튼
