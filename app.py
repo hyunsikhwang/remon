@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+"""Streamlit app to fetch apartment rent transaction data from public API."""
+
+from __future__ import annotations
+
+import datetime as dt
+import xml.etree.ElementTree as ET
+from typing import Dict, Iterable, List
+
+import pandas as pd
+import requests
+import streamlit as st
+
+API_URL = "https://apis.data.go.kr/1613000/RTMSDataSvcAptRent/getRTMSDataSvcAptRent"
+
+
+def month_range(start_yyyymm: str, end_yyyymm: str) -> Iterable[str]:
+    start = dt.datetime.strptime(start_yyyymm, "%Y%m")
+    end = dt.datetime.strptime(end_yyyymm, "%Y%m")
+    current = start
+    while current <= end:
+        yield current.strftime("%Y%m")
+        year = current.year + (current.month // 12)
+        month = (current.month % 12) + 1
+        current = dt.datetime(year, month, 1)
+
+
+def fetch_month(service_key: str, lawd_cd: str, deal_ymd: str) -> List[Dict[str, str]]:
+    params = {
+        "serviceKey": service_key,
+        "LAWD_CD": lawd_cd,
+        "DEAL_YMD": deal_ymd,
+        "numOfRows": 1000,
+        "pageNo": 1,
+    }
+    response = requests.get(API_URL, params=params, timeout=30)
+    response.raise_for_status()
+
+    root = ET.fromstring(response.text)
+    items = root.findall(".//item")
+    rows: List[Dict[str, str]] = []
+    for item in items:
+        row: Dict[str, str] = {}
+        for child in item:
+            if child.text is None:
+                continue
+            row[child.tag] = child.text.strip()
+        rows.append(row)
+    return rows
+
+
+def collect_transactions(
+    service_key: str,
+    lawd_cd: str,
+    start_yyyymm: str,
+    end_yyyymm: str,
+    apt_name_keyword: str | None = None,
+) -> pd.DataFrame:
+    all_rows: List[Dict[str, str]] = []
+    for deal_ymd in month_range(start_yyyymm, end_yyyymm):
+        all_rows.extend(fetch_month(service_key, lawd_cd, deal_ymd))
+
+    df = pd.DataFrame(all_rows)
+    if df.empty:
+        return df
+
+    if apt_name_keyword:
+        df = df[df.get("아파트", "").str.contains(apt_name_keyword, na=False)]
+
+    df = df.sort_values(by=["년", "월", "일"]).reset_index(drop=True)
+    return df
+
+
+st.set_page_config(page_title="전월세 실거래가 조회", page_icon="🏠", layout="wide")
+
+st.title("🏠 아파트 전월세 실거래가 조회")
+st.caption(
+    "공공데이터포털(국토교통부) 전월세 실거래가 API로 데이터를 조회합니다. "
+    "서비스키는 공공데이터포털에서 발급받은 키를 입력하세요."
+)
+
+with st.sidebar:
+    st.header("조회 조건")
+    service_key = st.text_input(
+        "서비스키(ServiceKey)",
+        type="password",
+        help="공공데이터포털에서 발급받은 서비스키를 입력하세요.",
+    )
+    lawd_cd = st.text_input(
+        "법정동코드(LAWD_CD)",
+        value="11680",
+        help="5자리 법정동코드 (예: 서울 강남구 11680)",
+    )
+    start_yyyymm = st.text_input("조회 시작 월 (YYYYMM)", value="202401")
+    end_yyyymm = st.text_input("조회 종료 월 (YYYYMM)", value="202403")
+    apt_keyword = st.text_input("아파트명 키워드(선택)", value="")
+    run_query = st.button("조회 실행")
+
+st.markdown(
+    """
+    **사용 방법**
+    1. 서비스키와 법정동코드를 입력합니다.
+    2. 조회 기간(YYYYMM)을 설정합니다.
+    3. 필요하면 아파트명 키워드를 입력합니다.
+    4. "조회 실행" 버튼을 누릅니다.
+    """
+)
+
+if run_query:
+    if not service_key:
+        st.error("서비스키를 입력해주세요.")
+    elif not lawd_cd or len(lawd_cd) != 5:
+        st.error("법정동코드는 5자리여야 합니다.")
+    else:
+        with st.spinner("데이터를 불러오는 중입니다..."):
+            df = collect_transactions(
+                service_key=service_key,
+                lawd_cd=lawd_cd,
+                start_yyyymm=start_yyyymm,
+                end_yyyymm=end_yyyymm,
+                apt_name_keyword=apt_keyword if apt_keyword else None,
+            )
+
+        if df.empty:
+            st.warning("조회 결과가 없습니다.")
+        else:
+            st.success(f"총 {len(df):,}건의 거래를 찾았습니다.")
+            st.dataframe(df, use_container_width=True)
+            csv_bytes = df.to_csv(index=False).encode("utf-8-sig")
+            st.download_button(
+                "CSV 다운로드",
+                data=csv_bytes,
+                file_name="apt_rent_transactions.csv",
+                mime="text/csv",
+            )
+else:
+    st.info("좌측 입력란을 채운 뒤 조회를 실행하세요.")
