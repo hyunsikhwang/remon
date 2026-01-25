@@ -107,15 +107,6 @@ st.markdown("""
         background-color: #fcfcfc;
         border-right: 1px solid #f0f0f0;
     }
-
-    /* 필터 판넬 */
-    .filter-panel {
-        background-color: #f9f9f9;
-        padding: 1.5rem;
-        border-radius: 12px;
-        border: 1px solid #eeeeee;
-        margin-bottom: 2rem;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -293,8 +284,7 @@ if st.session_state.df is not None:
     """, unsafe_allow_html=True)
     
     # --- 상세 필터 판넬 ---
-    with st.container():
-        st.markdown('<div class="filter-panel">', unsafe_allow_html=True)
+    with st.container(border=True):
         st.markdown("**🛠️ 상세 필터링**")
         filtered_df = raw_df.copy()
         
@@ -358,7 +348,6 @@ if st.session_state.df is not None:
             sel_floors = c4.multiselect("🏢 층수 선택", options=floor_list, default=default_floors, key="ms_floors")
             st.session_state.filter_floors = sel_floors
             filtered_df = filtered_df[filtered_df['층_num'].isin(sel_floors)]
-        st.markdown('</div>', unsafe_allow_html=True)
 
     # --- 핵심 지표 및 데이터 출력 ---
     if not filtered_df.empty:
