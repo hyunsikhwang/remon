@@ -11,15 +11,12 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- 커스텀 CSS (UI 스타일링 고도화) ---
+# --- 커스텀 CSS (UI 스타일링) ---
 st.markdown("""
     <style>
-    /* 메인 배경색 */
     .main {
         background-color: #f8f9fa;
     }
-    
-    /* 지표 카드 스타일 */
     [data-testid="stMetric"] {
         background-color: #ffffff;
         padding: 15px 20px;
@@ -27,14 +24,10 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         border: 1px solid #edf2f7;
     }
-    
-    /* 지표 텍스트 스타일 */
     [data-testid="stMetricValue"] {
         font-size: 1.6rem !important;
         color: #1a365d !important;
     }
-    
-    /* 버튼 스타일 */
     .stButton > button {
         width: 100%;
         border-radius: 6px;
@@ -42,14 +35,16 @@ st.markdown("""
         background-color: #2b6cb0;
         color: white;
     }
-    
-    /* 데이터프레임 여백 조절 */
-    .stDataFrame {
-        border-radius: 10px;
-        overflow: hidden;
-    }
     </style>
     """, unsafe_allow_html=True)
+
+# --- API 키 설정 (Streamlit Secrets) ---
+# .streamlit/secrets.toml 파일에 service_key = "..." 항목이 있어야 합니다.
+# 만약 Secrets에 없다면 사이드바에서 수동 입력을 허용하도록 설계했습니다.
+if "service_key" in st.secrets:
+    SECRET_KEY = st.secrets["service_key"]
+else:
+    SECRET_KEY = None
 
 # --- 세션 상태 초기화 ---
 if "df" not in st.session_state:
@@ -120,7 +115,14 @@ with st.sidebar:
     st.title("🏢 Search Portal")
     st.divider()
     
-    service_key = st.text_input("🔑 API 인증키", type="password", placeholder="공공데이터포털 서비스키")
+    # Secrets에 키가 없는 경우에만 입력창 표시
+    if not SECRET_KEY:
+        service_key_input = st.text_input("🔑 API 인증키 (수동 입력)", type="password", help="secrets.toml에 키가 설정되지 않았습니다.")
+        current_key = service_key_input
+    else:
+        st.success("✅ API 인증키가 시스템에 설정되었습니다.")
+        current_key = SECRET_KEY
+        
     st.divider()
     
     trade_type = st.radio("🏠 거래 유형", ["매매", "전월세"], index=1, horizontal=True)
@@ -142,8 +144,8 @@ with st.sidebar:
 
 # --- 조회 로직 ---
 if run_query:
-    if not service_key:
-        st.error("❗ 서비스키를 입력해 주세요.")
+    if not current_key:
+        st.error("❗ 서비스키가 설정되지 않았습니다. Secrets 설정 혹은 수동 입력을 확인하세요.")
     else:
         with st.spinner(f"⚡ {trade_type} 데이터 수집 중..."):
             sigungu_code, full_region_name = get_region_code(region_input)
@@ -152,7 +154,7 @@ if run_query:
                 st.error(f"❌ '{region_input}' 지역을 찾을 수 없습니다.")
             else:
                 try:
-                    api = TransactionPrice(service_key)
+                    api = TransactionPrice(current_key)
                     df = api.get_data(
                         property_type="아파트",
                         trade_type=trade_type,
@@ -164,17 +166,14 @@ if run_query:
                     if df is not None and not df.empty:
                         df = standardize_columns(df)
                         
-                        # 숫자 변환
                         target_cols = ['매매가', '보증금', '월세', '전용면적', '층']
                         for col in target_cols:
                             if col in df.columns:
                                 df[f'{col}_num'] = df[col].apply(to_numeric_safe)
                         
-                        # 필터링
                         if apt_keyword and '아파트' in df.columns:
                             df = df[df['아파트'].str.contains(apt_keyword, na=False)]
                         
-                        # 정렬
                         sort_cols = [c for c in ['년', '월', '일'] if c in df.columns]
                         if sort_cols:
                             df = df.sort_values(by=sort_cols, ascending=False).reset_index(drop=True)
@@ -196,7 +195,7 @@ if st.session_state.df is not None:
     
     st.header(f"📊 {st.session_state.region_name} {current_type} 실거래 분석")
     
-    # --- 상세 필터 (내장 컨테이너 사용으로 레이아웃 수정) ---
+    # --- 상세 필터 판넬 ---
     with st.container(border=True):
         st.markdown("**🛠️ 상세 필터링 판넬**")
         filtered_df = raw_df.copy()
@@ -231,50 +230,35 @@ if st.session_state.df is not None:
             sel_floors = c4.multiselect("🏢 층수 선택", options=floor_list, default=floor_list)
             filtered_df = filtered_df[filtered_df['층_num'].isin(sel_floors)]
 
-    # --- 대시보드 탭 ---
-    t1, t2 = st.tabs(["📈 핵심 지표", "📋 거래 목록"])
-    
-    with t1:
-        if not filtered_df.empty:
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("📊 총 거래", f"{len(filtered_df):,}건")
-            
-            if current_type == "매매":
-                if '매매가_num' in filtered_df.columns:
-                    m2.metric("📉 평균 매매", f"{filtered_df['매매가_num'].mean():,.0f}만")
-                    m3.metric("📈 최고 매매", f"{filtered_df['매매가_num'].max():,.0f}만")
-            else:
-                if '보증금_num' in filtered_df.columns:
-                    m2.metric("📉 평균 보증금", f"{filtered_df['보증금_num'].mean():,.0f}만")
-                if '월세_num' in filtered_df.columns:
-                    m3.metric("💵 평균 월세", f"{filtered_df['월세_num'].mean():,.0f}만")
-            
-            if '전용면적_num' in filtered_df.columns:
-                m4.metric("📐 평균 면적", f"{filtered_df['전용면적_num'].mean():,.1f}㎡")
-            
-            # 차트 에러 방지 (날짜 컬럼 존재 확인)
-            st.markdown("#### 최근 가격 추이")
-            chart_df = filtered_df.copy()
-            
-            # 날짜 인덱스 생성 시도
-            if all(k in chart_df.columns for k in ['년', '월', '일']):
-                chart_df['날짜'] = pd.to_datetime(chart_df[['년', '월', '일']].astype(str).agg('-'.join, axis=1))
-                price_col = '매매가_num' if current_type == "매매" else '보증금_num'
-                if price_col in chart_df.columns:
-                    # 날짜순 정렬 후 표시
-                    plot_data = chart_df.sort_values('날짜').set_index('날짜')[price_col]
-                    st.area_chart(plot_data, height=250)
-            else:
-                st.info("차트를 생성하기 위한 날짜 정보('일' 등)가 부족합니다.")
-        else:
-            st.warning("조회된 데이터가 없습니다.")
-
-    with t2:
-        # 가공용 컬럼 제거 후 표시
-        disp_df = filtered_df.drop(columns=[c for c in filtered_df.columns if c.endswith('_num')])
-        st.dataframe(disp_df, use_container_width=True, height=450)
+    # --- 핵심 지표 및 데이터 출력 ---
+    if not filtered_df.empty:
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("📊 총 거래", f"{len(filtered_df):,}건")
         
+        if current_type == "매매":
+            if '매매가_num' in filtered_df.columns:
+                m2.metric("📉 평균 매매", f"{filtered_df['매매가_num'].mean():,.0f}만")
+                m3.metric("📈 최고 매매", f"{filtered_df['매매가_num'].max():,.0f}만")
+        else:
+            if '보증금_num' in filtered_df.columns:
+                m2.metric("📉 평균 보증금", f"{filtered_df['보증금_num'].mean():,.0f}만")
+            if '월세_num' in filtered_df.columns:
+                m3.metric("💵 평균 월세", f"{filtered_df['월세_num'].mean():,.0f}만")
+        
+        if '전용면적_num' in filtered_df.columns:
+            m4.metric("📐 평균 면적", f"{filtered_df['전용면적_num'].mean():,.1f}㎡")
+        
+        st.divider()
+        
+        # 가공용 컬럼 제거 후 최종 리스트 출력
+        st.subheader("📋 실거래 내역 리스트")
+        disp_df = filtered_df.drop(columns=[c for c in filtered_df.columns if c.endswith('_num')])
+        st.dataframe(disp_df, use_container_width=True, height=550)
+        
+        # 다운로드 버튼
         csv = disp_df.to_csv(index=False).encode('utf-8-sig')
-        st.download_button("📥 결과 CSV 다운로드", data=csv, file_name=f"result.csv", use_container_width=True)
+        st.download_button("📥 결과 CSV 다운로드", data=csv, file_name=f"result_{datetime.datetime.now().strftime('%Y%m%d')}.csv", use_container_width=True)
+    else:
+        st.warning("조회된 데이터가 없습니다. 필터 조건을 조정해 보세요.")
 else:
     st.info("👈 사이드바에서 조회할 지역과 거래 유형을 선택해 주세요.")
