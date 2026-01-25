@@ -109,8 +109,6 @@ st.markdown(
 if run_query:
     if not service_key:
         st.error("서비스키를 입력해주세요.")
-    elif not lawd_cd or len(lawd_cd) != 5:
-        st.error("법정동코드는 5자리여야 합니다.")
     else:
         with st.spinner("데이터를 불러오는 중입니다..."):
             df = collect_transactions(
