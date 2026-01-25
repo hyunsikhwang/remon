@@ -72,7 +72,7 @@ def to_numeric_safe(x):
 # --- UI 레이아웃 ---
 st.title("🏠 아파트 전월세 실거래가 조회")
 st.markdown("""
-조회 버튼을 눌러 데이터를 먼저 가져오면, 상단에 **상세 필터(면적, 금액, 층)** UI가 나타납니다.
+조회 버튼을 눌러 데이터를 먼저 가져오면, 상단에 **상세 필터(금액, 면적, 층)** UI가 나타납니다.
 """)
 
 with st.sidebar:
@@ -119,14 +119,16 @@ if run_query:
                     if df is not None and not df.empty:
                         df = standardize_columns(df)
                         
-                        # 전처리
+                        # 필터링 및 계산을 위한 숫자형 전처리
                         for col in ['보증금', '월세', '전용면적', '층']:
                             if col in df.columns:
                                 df[f'{col}_num'] = df[col].apply(to_numeric_safe)
                         
+                        # 키워드 필터링
                         if apt_keyword and '아파트' in df.columns:
                             df = df[df['아파트'].str.contains(apt_keyword, na=False)]
                         
+                        # 정렬
                         sort_cols = [c for c in ['년', '월', '일'] if c in df.columns]
                         if sort_cols:
                             df = df.sort_values(by=sort_cols, ascending=False).reset_index(drop=True)
@@ -144,7 +146,6 @@ if run_query:
 if st.session_state.df is not None:
     raw_df = st.session_state.df.copy()
     
-    # --- 상세 필터 UI (데이터프레임 상단) ---
     st.write("---")
     st.subheader(f"🔍 {st.session_state.region_name} 상세 필터링")
     
@@ -155,35 +156,38 @@ if st.session_state.df is not None:
         
         filtered_df = raw_df.copy()
         
-        # 1. 전용면적 (Slider)
-        if '전용면적_num' in raw_df.columns:
-            min_v = float(raw_df['전용면적_num'].min())
-            max_v = float(raw_df['전용면적_num'].max())
-            if min_v == max_v: max_v += 0.1
-            area_sel = row1_col1.slider("📐 전용면적 범위 (㎡)", min_v, max_v, (min_v, max_v), step=0.1)
-            filtered_df = filtered_df[(filtered_df['전용면적_num'] >= area_sel[0]) & (filtered_df['전용면적_num'] <= area_sel[1])]
-
-        # 2. 보증금 (Slider)
+        # 1. 보증금 (Slider) - 첫 번째 줄
         if '보증금_num' in raw_df.columns:
             min_v = int(raw_df['보증금_num'].min())
             max_v = int(raw_df['보증금_num'].max())
             if min_v == max_v: max_v += 100
-            dep_sel = row1_col2.slider("💰 보증금 범위 (만원)", min_v, max_v, (min_v, max_v), step=500)
+            dep_sel = row1_col1.slider("💰 보증금 범위 (만원)", min_v, max_v, (min_v, max_v), step=500)
             filtered_df = filtered_df[(filtered_df['보증금_num'] >= dep_sel[0]) & (filtered_df['보증금_num'] <= dep_sel[1])]
 
-        # 3. 월세 (Slider)
+        # 2. 월세 (Slider) - 첫 번째 줄
         if '월세_num' in raw_df.columns:
             min_v = int(raw_df['월세_num'].min())
             max_v = int(raw_df['월세_num'].max())
             if min_v == max_v: max_v += 10
-            rent_sel = row2_col1.slider("💵 월세 범위 (만원)", min_v, max_v, (min_v, max_v), step=10)
+            rent_sel = row1_col2.slider("💵 월세 범위 (만원)", min_v, max_v, (min_v, max_v), step=10)
             filtered_df = filtered_df[(filtered_df['월세_num'] >= rent_sel[0]) & (filtered_df['월세_num'] <= rent_sel[1])]
 
-        # 4. 층 (Select Box / Multi-select)
+        # 3. 전용면적 (Multi-select) - 두 번째 줄
+        if '전용면적' in raw_df.columns:
+            # 면적 데이터를 소수점 첫째자리까지 표시하여 유니크한 리스트 생성
+            area_list = sorted(raw_df['전용면적_num'].unique())
+            selected_areas = row2_col1.multiselect(
+                "📐 전용면적 선택 (㎡)", 
+                options=area_list, 
+                default=area_list,
+                help="조회된 데이터에 존재하는 전용면적 항목들입니다."
+            )
+            filtered_df = filtered_df[filtered_df['전용면적_num'].isin(selected_areas)]
+
+        # 4. 층 (Multi-select) - 두 번째 줄
         if '층' in raw_df.columns:
-            # 층 데이터 정렬하여 리스트화
             floor_list = sorted(raw_df['층_num'].unique().astype(int))
-            selected_floors = row2_col2.multiselect("🏢 층수 선택 (복수 선택 가능)", options=floor_list, default=floor_list)
+            selected_floors = row2_col2.multiselect("🏢 층수 선택", options=floor_list, default=floor_list)
             filtered_df = filtered_df[filtered_df['층_num'].isin(selected_floors)]
 
     # --- 요약 지표 ---
@@ -203,9 +207,9 @@ if st.session_state.df is not None:
         st.dataframe(display_df, use_container_width=True)
         
         csv = display_df.to_csv(index=False).encode('utf-8-sig')
-        st.download_button("📥 필터링된 결과 다운로드 (CSV)", data=csv, file_name=f"filtered_data.csv", mime="text/csv")
+        st.download_button("📥 필터링 결과 다운로드", data=csv, file_name=f"filtered_data.csv", mime="text/csv")
     else:
-        st.warning("선택하신 필터 조건에 일치하는 데이터가 없습니다. 필터를 조정해 보세요.")
+        st.warning("선택하신 필터 조건에 일치하는 데이터가 없습니다.")
 
 elif not run_query:
     st.info("💡 왼쪽 사이드바에서 지역과 기간을 설정한 후 [조회 실행] 버튼을 눌러주세요.")
