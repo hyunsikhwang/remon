@@ -39,8 +39,6 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- API 키 설정 (Streamlit Secrets) ---
-# .streamlit/secrets.toml 파일에 service_key = "..." 항목이 있어야 합니다.
-# 만약 Secrets에 없다면 사이드바에서 수동 입력을 허용하도록 설계했습니다.
 if "service_key" in st.secrets:
     SECRET_KEY = st.secrets["service_key"]
 else:
@@ -115,7 +113,6 @@ with st.sidebar:
     st.title("🏢 Search Portal")
     st.divider()
     
-    # Secrets에 키가 없는 경우에만 입력창 표시
     if not SECRET_KEY:
         service_key_input = st.text_input("🔑 API 인증키 (수동 입력)", type="password", help="secrets.toml에 키가 설정되지 않았습니다.")
         current_key = service_key_input
@@ -263,7 +260,8 @@ if st.session_state.df is not None:
         
         disp_df = filtered_df.drop(columns=actual_drop_cols)
         
-        st.dataframe(disp_df, use_container_width=True, height=550)
+        # hide_index=True를 추가하여 인덱스 컬럼을 숨김
+        st.dataframe(disp_df, use_container_width=True, height=550, hide_index=True)
         
         # 다운로드 버튼
         csv = disp_df.to_csv(index=False).encode('utf-8-sig')
