@@ -251,7 +251,7 @@ if st.session_state.df is not None:
         st.subheader("📋 실거래 내역 리스트")
         
         # 사용자 요청에 따라 특정 컬럼 및 road로 시작하는 컬럼 제외
-        fixed_exclude = ['index', 'sggCd', 'umdNm', '아파트', 'jibun', 'buildYear', 'aptSeq']
+        fixed_exclude = ['index', 'sggCd', 'umdNm', 'jibun', 'buildYear', 'aptSeq']
         road_exclude = [c for c in filtered_df.columns if str(c).startswith('road')]
         internal_exclude = [c for c in filtered_df.columns if str(c).endswith('_num')]
         
