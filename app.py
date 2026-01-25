@@ -23,8 +23,12 @@ st.markdown("""
         max-width: 1100px !important;
     }
     
+    /* 헤더 영역 투명화 및 불필요 요소 숨김 (사이드바 토글 버튼은 유지) */
     [data-testid="stHeader"] {
-        display: none;
+        background-color: rgba(0,0,0,0) !important;
+    }
+    .stDeployButton, #MainMenu {
+        display: none !important;
     }
 
     /* 전역 스타일 */
