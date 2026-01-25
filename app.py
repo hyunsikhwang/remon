@@ -48,24 +48,24 @@ def get_region_code(region_name):
 
 def standardize_columns(df):
     """API 반환 컬럼명을 앱에서 사용하는 표준 명칭으로 변경"""
-    # 아파트 이름 관련 컬럼 매핑
-    apt_cols = ['단지', '아파트', '단지명', '건물명']
+    # 아파트 이름 관련 컬럼 매핑 (aptNm 추가)
+    apt_cols = ['단지', '아파트', '단지명', '건물명', 'aptNm']
     for col in apt_cols:
-        if col in df.columns and col != '아파트':
+        if col in df.columns:
             df = df.rename(columns={col: '아파트'})
             break
             
     # 보증금 관련 컬럼 매핑
-    deposit_cols = ['보증금', '보증금액', '보증금(만원)']
+    deposit_cols = ['보증금', '보증금액', '보증금(만원)', 'deposit']
     for col in deposit_cols:
-        if col in df.columns and col != '보증금':
+        if col in df.columns:
             df = df.rename(columns={col: '보증금'})
             break
             
     # 월세 관련 컬럼 매핑
-    rent_cols = ['월세', '월세액', '월세(만원)']
+    rent_cols = ['월세', '월세액', '월세(만원)', 'monthlyRent']
     for col in rent_cols:
-        if col in df.columns and col != '월세':
+        if col in df.columns:
             df = df.rename(columns={col: '월세'})
             break
             
@@ -120,10 +120,10 @@ if run_query:
                     )
                     
                     if df is not None and not df.empty:
-                        # [핵심 수정] 컬럼명 표준화 작업
+                        # 컬럼명 표준화 (aptNm -> 아파트)
                         df = standardize_columns(df)
                         
-                        # 키워드 필터링 (표준화된 '아파트' 컬럼 사용)
+                        # 키워드 필터링
                         if apt_keyword and '아파트' in df.columns:
                             df = df[df['아파트'].str.contains(apt_keyword, na=False)]
                         
@@ -140,7 +140,6 @@ if run_query:
                         
                 except Exception as e:
                     st.error(f"❌ 데이터 처리 중 오류 발생: {e}")
-                    # 오류 발생 시 컬럼명 확인을 위해 로그 출력 (디버깅용)
                     if 'df' in locals() and df is not None:
                         st.info(f"수신된 컬럼명: {list(df.columns)}")
 
@@ -155,7 +154,6 @@ if st.session_state.df is not None:
             val = re.sub(r'[^0-9]', '', str(x))
             return int(val) if val else 0
 
-        # 표준화된 컬럼명이 존재할 경우에만 계산
         if '보증금' in df.columns:
             df['보증금_int'] = df['보증금'].apply(to_int)
             c1, c2, c3 = st.columns(3)
