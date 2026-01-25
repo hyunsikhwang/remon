@@ -4,9 +4,8 @@
 from __future__ import annotations
 
 import datetime as dt
-import inspect
 import xml.etree.ElementTree as ET
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List
 
 import pandas as pd
 import requests
@@ -50,65 +49,6 @@ def fetch_month(service_key: str, lawd_cd: str, deal_ymd: str) -> List[Dict[str,
     return rows
 
 
-def _try_public_data_reader(
-    service_key: str, lawd_cd: str, start_yyyymm: str, end_yyyymm: str
-) -> Optional[pd.DataFrame]:
-    try:
-        import PublicDataReader as pdr
-    except ImportError:
-        return None
-
-    api = None
-    if hasattr(pdr, "TransactionPrice"):
-        api = pdr.TransactionPrice(service_key)
-    elif hasattr(pdr, "PublicDataReader"):
-        api = pdr.PublicDataReader(service_key)
-
-    if api is None:
-        return None
-
-    for method_name in ("get_data", "get_rent_data", "get_data_by_month"):
-        if not hasattr(api, method_name):
-            continue
-        method = getattr(api, method_name)
-        signature = inspect.signature(method)
-        month_frames: List[pd.DataFrame] = []
-        for deal_ymd in month_range(start_yyyymm, end_yyyymm):
-            kwargs = {}
-            if "lawd_cd" in signature.parameters:
-                kwargs["lawd_cd"] = lawd_cd
-            if "deal_ymd" in signature.parameters:
-                kwargs["deal_ymd"] = deal_ymd
-            if "trade_month" in signature.parameters:
-                kwargs["trade_month"] = deal_ymd
-            if "year" in signature.parameters:
-                kwargs["year"] = deal_ymd[:4]
-            if "month" in signature.parameters:
-                kwargs["month"] = deal_ymd[4:]
-            if "property_type" in signature.parameters:
-                kwargs["property_type"] = "apt_rent"
-            if "data_type" in signature.parameters:
-                kwargs["data_type"] = "rent"
-            try:
-                result = method(**kwargs)
-            except TypeError:
-                continue
-            if isinstance(result, pd.DataFrame):
-                month_frames.append(result)
-        if month_frames:
-            return pd.concat(month_frames, ignore_index=True)
-
-    return None
-
-
-def _public_data_reader_available() -> bool:
-    try:
-        import PublicDataReader as pdr  # noqa: F401
-    except ImportError:
-        return False
-    return True
-
-
 def collect_transactions(
     service_key: str,
     lawd_cd: str,
@@ -116,25 +56,16 @@ def collect_transactions(
     end_yyyymm: str,
     apt_name_keyword: str | None = None,
 ) -> pd.DataFrame:
-    public_data_reader_df = _try_public_data_reader(
-        service_key=service_key,
-        lawd_cd=lawd_cd,
-        start_yyyymm=start_yyyymm,
-        end_yyyymm=end_yyyymm,
-    )
-    if public_data_reader_df is not None:
-        df = public_data_reader_df
-    else:
-        all_rows: List[Dict[str, str]] = []
-        for deal_ymd in month_range(start_yyyymm, end_yyyymm):
-            all_rows.extend(fetch_month(service_key, lawd_cd, deal_ymd))
+    all_rows: List[Dict[str, str]] = []
+    for deal_ymd in month_range(start_yyyymm, end_yyyymm):
+        all_rows.extend(fetch_month(service_key, lawd_cd, deal_ymd))
 
-        df = pd.DataFrame(all_rows)
+    df = pd.DataFrame(all_rows)
     if df.empty:
         return df
 
-    if apt_name_keyword and "아파트" in df.columns:
-        df = df[df["아파트"].str.contains(apt_name_keyword, na=False)]
+    if apt_name_keyword:
+        df = df[df.get("아파트", "").str.contains(apt_name_keyword, na=False)]
 
     df = df.sort_values(by=["년", "월", "일"]).reset_index(drop=True)
     return df
@@ -164,13 +95,6 @@ with st.sidebar:
     end_yyyymm = st.text_input("조회 종료 월 (YYYYMM)", value="202403")
     apt_keyword = st.text_input("아파트명 키워드(선택)", value="")
     run_query = st.button("조회 실행")
-    if _public_data_reader_available():
-        st.success("PublicDataReader 사용 가능: 우선적으로 라이브러리를 사용합니다.")
-    else:
-        st.info(
-            "PublicDataReader 미설치: 기본 API 호출로 동작합니다. "
-            "Streamlit Cloud에서는 requirements.txt에 `PublicDataReader`를 추가하세요."
-        )
 
 st.markdown(
     """
