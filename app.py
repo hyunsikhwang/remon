@@ -11,32 +11,113 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- 커스텀 CSS (UI 스타일링) ---
+# --- 커스텀 CSS (Value Horizon UI 스타일) ---
 st.markdown("""
-    <style>
-    .main {
-        background-color: #f8f9fa;
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+    /* 컨테이너 최적화 */
+    .block-container {
+        padding-top: 1.5rem !important;
+        padding-bottom: 2rem !important;
+        max-width: 1100px !important;
     }
+    
+    [data-testid="stHeader"] {
+        display: none;
+    }
+
+    /* 전역 스타일 */
+    .stApp {
+        background-color: #ffffff;
+        color: #1a1a1a;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    /* Hero Section */
+    .hero-container {
+        padding: 2rem 0;
+        text-align: center;
+        border-bottom: 1px solid #f5f5f5;
+        margin-bottom: 2.5rem;
+    }
+
+    .hero-title {
+        font-size: 2.4rem;
+        font-weight: 700;
+        color: #111111;
+        margin-bottom: 0.5rem;
+        letter-spacing: -0.8px;
+    }
+
+    .hero-subtitle {
+        font-size: 1rem;
+        font-weight: 400;
+        color: #666666;
+    }
+
+    /* Metric Card 스타일 수정 */
     [data-testid="stMetric"] {
         background-color: #ffffff;
-        padding: 15px 20px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        border: 1px solid #edf2f7;
+        padding: 1.25rem;
+        border-radius: 12px;
+        border: 1px solid #eaeaea;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        transition: all 0.2s ease;
     }
+    
+    [data-testid="stMetric"]:hover {
+        border-color: #007aff;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    [data-testid="stMetricLabel"] {
+        font-size: 0.85rem !important;
+        font-weight: 600 !important;
+        color: #888888 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
     [data-testid="stMetricValue"] {
-        font-size: 1.6rem !important;
-        color: #1a365d !important;
+        font-size: 1.5rem !important;
+        font-weight: 700 !important;
+        color: #111111 !important;
     }
+
+    /* 버튼 스타일 */
     .stButton > button {
         width: 100%;
-        border-radius: 6px;
+        border-radius: 8px;
         font-weight: 600;
-        background-color: #2b6cb0;
+        background-color: #007aff;
         color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        transition: all 0.2s;
     }
-    </style>
-    """, unsafe_allow_html=True)
+    
+    .stButton > button:hover {
+        background-color: #0063d1;
+        box-shadow: 0 4px 8px rgba(0,122,255,0.2);
+    }
+
+    /* 사이드바 스타일링 */
+    [data-testid="stSidebar"] {
+        background-color: #fcfcfc;
+        border-right: 1px solid #f0f0f0;
+    }
+
+    /* 필터 판넬 */
+    .filter-panel {
+        background-color: #f9f9f9;
+        padding: 1.5rem;
+        border-radius: 12px;
+        border: 1px solid #eeeeee;
+        margin-bottom: 2rem;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # --- API 키 설정 (Streamlit Secrets) ---
 if "service_key" in st.secrets:
@@ -49,8 +130,15 @@ if "df" not in st.session_state:
     st.session_state.df = None
 if "region_name" not in st.session_state:
     st.session_state.region_name = ""
-if "trade_type" not in st.session_state:
-    st.session_state.trade_type = "전월세"
+if "trade_type_val" not in st.session_state:
+    st.session_state.trade_type_val = "전월세"
+
+# 필터링 조건 유지를 위한 상태 초기화
+if "filter_deal_price" not in st.session_state: st.session_state.filter_deal_price = None
+if "filter_dep_price" not in st.session_state: st.session_state.filter_dep_price = None
+if "filter_rent_price" not in st.session_state: st.session_state.filter_rent_price = None
+if "filter_areas" not in st.session_state: st.session_state.filter_areas = []
+if "filter_floors" not in st.session_state: st.session_state.filter_floors = []
 
 @st.cache_resource
 def load_bdong_data():
@@ -110,34 +198,37 @@ def to_numeric_safe(x):
 
 # --- 사이드바 ---
 with st.sidebar:
-    st.title("🏢 Search Portal")
-    st.divider()
+    st.markdown('<div style="font-size: 1.5rem; font-weight: 700; color: #111111; margin-bottom: 0.5rem;">🏢 Search Portal</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size: 0.85rem; color: #888888; margin-bottom: 1.5rem;">실거래가 데이터 조회</div>', unsafe_allow_html=True)
     
     if not SECRET_KEY:
-        service_key_input = st.text_input("🔑 API 인증키 (수동 입력)", type="password", help="secrets.toml에 키가 설정되지 않았습니다.")
-        current_key = service_key_input
+        current_key = st.text_input("🔑 API 인증키", type="password", help="공공데이터포털 API 키")
     else:
-        st.success("✅ API 인증키가 시스템에 설정되었습니다.")
+        st.info("✅ API 키가 설정되어 있습니다.")
         current_key = SECRET_KEY
         
     st.divider()
     
-    trade_type = st.radio("🏠 거래 유형", ["매매", "전월세"], index=1, horizontal=True)
-    region_input = st.text_input("📍 지역명", value="송파구")
+    trade_type = st.radio("🏠 거래 유형", ["매매", "전월세"], 
+                         index=0 if st.session_state.trade_type_val == "매매" else 1, 
+                         horizontal=True, key="trade_type_radio")
+    st.session_state.trade_type_val = trade_type
+    
+    region_input = st.text_input("📍 지역명 (시군구)", value="송파구", key="region_input_text")
     
     today = datetime.date.today()
     col1, col2 = st.columns(2)
     with col1:
-        start_date = st.date_input("🗓️ 시작월", value=datetime.date(today.year, today.month, 1) - datetime.timedelta(days=90))
+        start_date = st.date_input("🗓️ 시작월", value=datetime.date(today.year, today.month, 1) - datetime.timedelta(days=90), key="start_date_input")
     with col2:
-        end_date = st.date_input("🗓️ 종료월", value=today)
+        end_date = st.date_input("🗓️ 종료월", value=today, key="end_date_input")
         
     start_ym = start_date.strftime("%Y%m")
     end_ym = end_date.strftime("%Y%m")
-    apt_keyword = st.text_input("🔍 아파트명 키워드")
+    apt_keyword = st.text_input("🔍 아파트명 키워드", key="apt_keyword_input")
     
     st.divider()
-    run_query = st.button("🚀 데이터 조회 실행", type="primary")
+    run_query = st.button("데이터 조회 실행", type="primary", use_container_width=True)
 
 # --- 조회 로직 ---
 if run_query:
@@ -177,24 +268,34 @@ if run_query:
                         
                         st.session_state.df = df
                         st.session_state.region_name = full_region_name
-                        st.session_state.trade_type = trade_type
+                        st.session_state.trade_type_val = trade_type
+                        
+                        # 새로운 데이터를 조회할 때 필터 초기화가 필요하다면 여기서 수행 (요구사항은 유지이므로 생략)
                     else:
                         st.session_state.df = None
                         st.warning(f"⚠️ {full_region_name} 데이터가 없습니다.")
                         
                 except Exception as e:
                     st.error(f"❌ API 오류: {e}")
+                    st.session_state.df = None
 
 # --- 메인 UI ---
 if st.session_state.df is not None:
     raw_df = st.session_state.df.copy()
-    current_type = st.session_state.trade_type
+    current_type = st.session_state.trade_type_val
     
-    st.header(f"📊 {st.session_state.region_name} {current_type} 실거래 분석")
+    # Hero Section
+    st.markdown(f"""
+    <div class="hero-container">
+        <div class="hero-title">Real Estate Insights</div>
+        <div class="hero-subtitle">{st.session_state.region_name} {current_type} 실거래 분석 리포트</div>
+    </div>
+    """, unsafe_allow_html=True)
     
     # --- 상세 필터 판넬 ---
-    with st.container(border=True):
-        st.markdown("**🛠️ 상세 필터링 판넬**")
+    with st.container():
+        st.markdown('<div class="filter-panel">', unsafe_allow_html=True)
+        st.markdown("**🛠️ 상세 필터링**")
         filtered_df = raw_df.copy()
         
         c1, c2 = st.columns(2)
@@ -202,30 +303,62 @@ if st.session_state.df is not None:
             if '매매가_num' in raw_df.columns:
                 min_v, max_v = int(raw_df['매매가_num'].min()), int(raw_df['매매가_num'].max())
                 if min_v == max_v: max_v += 1000
-                deal_sel = c1.slider("💰 매매가 (만원)", min_v, max_v, (min_v, max_v), step=1000)
+                
+                # 세션 상태에서 이전 값 가져오기
+                default_val = st.session_state.filter_deal_price if st.session_state.filter_deal_price else (min_v, max_v)
+                # 범위가 현재 데이터 범위를 벗어나면 조정
+                default_val = (max(min_v, default_val[0]), min(max_v, default_val[1]))
+                
+                deal_sel = c1.slider("💰 매매가 (만원)", min_v, max_v, default_val, step=1000, key="slider_deal")
+                st.session_state.filter_deal_price = deal_sel
                 filtered_df = filtered_df[filtered_df['매매가_num'].between(deal_sel[0], deal_sel[1])]
         else:
             if '보증금_num' in raw_df.columns:
                 min_v, max_v = int(raw_df['보증금_num'].min()), int(raw_df['보증금_num'].max())
                 if min_v == max_v: max_v += 100
-                dep_sel = c1.slider("💰 보증금 (만원)", min_v, max_v, (min_v, max_v), step=500)
+                
+                default_val = st.session_state.filter_dep_price if st.session_state.filter_dep_price else (min_v, max_v)
+                default_val = (max(min_v, default_val[0]), min(max_v, default_val[1]))
+                
+                dep_sel = c1.slider("💰 보증금 (만원)", min_v, max_v, default_val, step=500, key="slider_dep")
+                st.session_state.filter_dep_price = dep_sel
                 filtered_df = filtered_df[filtered_df['보증금_num'].between(dep_sel[0], dep_sel[1])]
+            
             if '월세_num' in raw_df.columns:
                 min_v, max_v = int(raw_df['월세_num'].min()), int(raw_df['월세_num'].max())
                 if min_v == max_v: max_v += 10
-                rent_sel = c2.slider("💵 월세 (만원)", min_v, max_v, (min_v, max_v), step=10)
+                
+                default_val = st.session_state.filter_rent_price if st.session_state.filter_rent_price else (min_v, max_v)
+                default_val = (max(min_v, default_val[0]), min(max_v, default_val[1]))
+                
+                rent_sel = c2.slider("💵 월세 (만원)", min_v, max_v, default_val, step=10, key="slider_rent")
+                st.session_state.filter_rent_price = rent_sel
                 filtered_df = filtered_df[filtered_df['월세_num'].between(rent_sel[0], rent_sel[1])]
 
         c3, c4 = st.columns(2)
         if '전용면적_num' in raw_df.columns:
             area_list = sorted(raw_df['전용면적_num'].unique())
-            sel_areas = c3.multiselect("📐 전용면적 (㎡)", options=area_list, default=area_list)
+            
+            default_areas = st.session_state.filter_areas if st.session_state.filter_areas else area_list
+            # 현재 데이터에 존재하는 값들로만 교차 선택
+            default_areas = [a for a in default_areas if a in area_list]
+            if not default_areas: default_areas = area_list
+            
+            sel_areas = c3.multiselect("📐 전용면적 (㎡)", options=area_list, default=default_areas, key="ms_areas")
+            st.session_state.filter_areas = sel_areas
             filtered_df = filtered_df[filtered_df['전용면적_num'].isin(sel_areas)]
 
         if '층_num' in raw_df.columns:
             floor_list = sorted(raw_df['층_num'].unique().astype(int))
-            sel_floors = c4.multiselect("🏢 층수 선택", options=floor_list, default=floor_list)
+            
+            default_floors = st.session_state.filter_floors if st.session_state.filter_floors else floor_list
+            default_floors = [f for f in default_floors if f in floor_list]
+            if not default_floors: default_floors = floor_list
+            
+            sel_floors = c4.multiselect("🏢 층수 선택", options=floor_list, default=default_floors, key="ms_floors")
+            st.session_state.filter_floors = sel_floors
             filtered_df = filtered_df[filtered_df['층_num'].isin(sel_floors)]
+        st.markdown('</div>', unsafe_allow_html=True)
 
     # --- 핵심 지표 및 데이터 출력 ---
     if not filtered_df.empty:
@@ -265,8 +398,15 @@ if st.session_state.df is not None:
         
         # 다운로드 버튼
         csv = disp_df.to_csv(index=False).encode('utf-8-sig')
-        st.download_button("📥 결과 CSV 다운로드", data=csv, file_name=f"result_{datetime.datetime.now().strftime('%Y%m%d')}.csv", use_container_width=True)
+        st.download_button("📥 Result CSV Download", data=csv, file_name=f"result_{datetime.datetime.now().strftime('%Y%m%d')}.csv", use_container_width=True)
     else:
         st.warning("조회된 데이터가 없습니다. 필터 조건을 조정해 보세요.")
 else:
+    # 대기화면 Hero
+    st.markdown("""
+    <div class="hero-container">
+        <div class="hero-title">Real Estate Insights</div>
+        <div class="hero-subtitle">데이터 기반 아파트 실거래가 분석 대시보드</div>
+    </div>
+    """, unsafe_allow_html=True)
     st.info("👈 사이드바에서 조회할 지역과 거래 유형을 선택해 주세요.")
