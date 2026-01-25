@@ -162,6 +162,7 @@ if st.session_state.df is not None:
         if '전용면적_num' in raw_df.columns:
             min_area = float(raw_df['전용면적_num'].min())
             max_area = float(raw_df['전용면적_num'].max())
+            if min_area == max_area: max_area += 0.1
             area_range = f_col1.slider("전용면적 (㎡)", min_area, max_area, (min_area, max_area), step=0.1)
             filtered_df = filtered_df[
                 (filtered_df['전용면적_num'] >= area_range[0]) & 
@@ -172,7 +173,8 @@ if st.session_state.df is not None:
         if '보증금_num' in raw_df.columns:
             min_dep = int(raw_df['보증금_num'].min())
             max_dep = int(raw_df['보증금_num'].max())
-            dep_range = f_col2.slider("보증금 (만원)", min_dep, max_dep, (min_dep, max_dep), step=500)
+            if min_dep == max_dep: max_dep += 100
+            dep_range = f_col2.slider("보증금 (만원)", min_dep, max_dep, (min_dep, max_dep), step=100)
             filtered_df = filtered_df[
                 (filtered_df['보증금_num'] >= dep_range[0]) & 
                 (filtered_df['보증금_num'] <= dep_range[1])
@@ -182,6 +184,7 @@ if st.session_state.df is not None:
         if '월세_num' in raw_df.columns:
             min_rent = int(raw_df['월세_num'].min())
             max_rent = int(raw_df['월세_num'].max())
+            if min_rent == max_rent: max_rent += 10
             rent_range = f_col3.slider("월세 (만원)", min_rent, max_rent, (min_rent, max_rent), step=10)
             filtered_df = filtered_df[
                 (filtered_df['월세_num'] >= rent_range[0]) & 
@@ -192,6 +195,7 @@ if st.session_state.df is not None:
         if '층_num' in raw_df.columns:
             min_floor = int(raw_df['층_num'].min())
             max_floor = int(raw_df['층_num'].max())
+            if min_floor == max_floor: max_floor += 1
             floor_range = f_col4.slider("층수", min_floor, max_floor, (min_floor, max_floor), step=1)
             filtered_df = filtered_df[
                 (filtered_df['층_num'] >= floor_range[0]) & 
@@ -202,9 +206,24 @@ if st.session_state.df is not None:
     m1, m2, m3, m4 = st.columns(4)
     if not filtered_df.empty:
         m1.metric("검색 결과", f"{len(filtered_df):,} 건")
-        m2.metric("평균 보증금", f"{filtered_df['보증금_num'].mean():,.0f} 만원")
-        m3.metric("평균 월세", f"{filtered_df['월세_int' if '월세_int' in filtered_df else '월세_num'].mean():,.0f} 만원" if '월세_num' in filtered_df else "0 만원")
-        m4.metric("평균 면적", f"{filtered_df['전용면적_num'].mean():,.1f} ㎡")
+        
+        # 보증금 통계
+        if '보증금_num' in filtered_df.columns:
+            m2.metric("평균 보증금", f"{filtered_df['보증금_num'].mean():,.0f} 만원")
+        else:
+            m2.metric("평균 보증금", "N/A")
+            
+        # 월세 통계
+        if '월세_num' in filtered_df.columns:
+            m3.metric("평균 월세", f"{filtered_df['월세_num'].mean():,.0f} 만원")
+        else:
+            m3.metric("평균 월세", "N/A")
+            
+        # 면적 통계
+        if '전용면적_num' in filtered_df.columns:
+            m4.metric("평균 면적", f"{filtered_df['전용면적_num'].mean():,.1f} ㎡")
+        else:
+            m4.metric("평균 면적", "N/A")
     else:
         st.warning("선택한 필터 조건에 맞는 데이터가 없습니다.")
 
