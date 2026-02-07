@@ -3,6 +3,7 @@ import pandas as pd
 from PublicDataReader import TransactionPrice, code_bdong
 import datetime
 import re
+import html
 
 # --- 페이지 설정 ---
 st.set_page_config(
@@ -125,6 +126,45 @@ st.markdown("""
     .stSlider, .stMultiSelect {
         margin-bottom: 1rem !important;
     }
+
+    /* 실거래 리스트 모던 테이블 */
+    .modern-table-wrap {
+        border: 1px solid #e9ecef;
+        border-radius: 12px;
+        overflow: auto;
+        max-height: 550px;
+        background: #ffffff;
+    }
+    .modern-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-size: 0.9rem;
+        color: #1f2937;
+    }
+    .modern-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: #f8fafc;
+        color: #374151;
+        text-align: left;
+        padding: 0.8rem 0.9rem;
+        border-bottom: 1px solid #e5e7eb;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .modern-table tbody td {
+        padding: 0.78rem 0.9rem;
+        border-bottom: 1px solid #f1f3f5;
+        white-space: nowrap;
+    }
+    .modern-table tbody tr:hover td {
+        background: #f8fafc;
+    }
+    .modern-table tbody tr:last-child td {
+        border-bottom: none;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -141,6 +181,8 @@ if "region_name" not in st.session_state:
     st.session_state.region_name = ""
 if "trade_type_val" not in st.session_state:
     st.session_state.trade_type_val = "전월세"
+if "df_nonce" not in st.session_state:
+    st.session_state.df_nonce = 0
 
 # 필터링 조건 유지를 위한 상태 초기화
 if "filter_deal_price" not in st.session_state: st.session_state.filter_deal_price = None
@@ -204,6 +246,114 @@ def to_numeric_safe(x):
     if pd.isna(x) or x == '': return 0.0
     val = re.sub(r'[^0-9.]', '', str(x))
     return float(val) if val else 0.0
+
+def apply_all_column_filters(df, key_prefix):
+    """출력용 데이터프레임의 모든 컬럼에 대해 동적 필터 적용"""
+    if df is None or df.empty:
+        return df
+
+    st.markdown("**🔎 리스트 전체 컬럼 필터**")
+    selected_cols = st.multiselect(
+        "필터할 컬럼 선택",
+        options=list(df.columns),
+        default=[],
+        key=f"{key_prefix}_selected_cols"
+    )
+
+    if not selected_cols:
+        return df
+
+    mask = pd.Series(True, index=df.index)
+    for col in selected_cols:
+        series = df[col]
+        safe_col = re.sub(r'[^0-9a-zA-Z_가-힣]', '_', str(col))
+
+        numeric_series = pd.to_numeric(series, errors='coerce')
+        numeric_ratio = numeric_series.notna().mean() if len(series) else 0
+
+        # 숫자로 해석 가능한 컬럼은 범위 필터 제공
+        if numeric_ratio >= 0.9 and numeric_series.notna().any():
+            min_v = float(numeric_series.min())
+            max_v = float(numeric_series.max())
+
+            if min_v == max_v:
+                st.caption(f"`{col}`: 단일 값({min_v:g})만 존재하여 필터를 생략합니다.")
+                continue
+
+            is_int_like = (numeric_series.dropna() % 1 == 0).all()
+            if is_int_like:
+                slider_min = int(min_v)
+                slider_max = int(max_v)
+                step = 1 if slider_max - slider_min <= 200 else max(1, (slider_max - slider_min) // 200)
+                selected_range = st.slider(
+                    f"{col} 범위",
+                    min_value=slider_min,
+                    max_value=slider_max,
+                    value=(slider_min, slider_max),
+                    step=step,
+                    key=f"{key_prefix}_{safe_col}_range"
+                )
+            else:
+                selected_range = st.slider(
+                    f"{col} 범위",
+                    min_value=min_v,
+                    max_value=max_v,
+                    value=(min_v, max_v),
+                    key=f"{key_prefix}_{safe_col}_range"
+                )
+
+            mask &= numeric_series.between(selected_range[0], selected_range[1], inclusive='both')
+            continue
+
+        # 문자열 컬럼은 고유값 수에 따라 다중선택/부분검색 제공
+        str_series = series.astype(str)
+        unique_vals = sorted([v for v in str_series.dropna().unique().tolist() if v != "nan"])
+
+        if len(unique_vals) <= 100:
+            selected_vals = st.multiselect(
+                f"{col} 값 선택",
+                options=unique_vals,
+                default=unique_vals,
+                key=f"{key_prefix}_{safe_col}_values"
+            )
+            mask &= str_series.isin(selected_vals)
+        else:
+            keyword = st.text_input(
+                f"{col} 부분검색",
+                value="",
+                key=f"{key_prefix}_{safe_col}_keyword",
+                placeholder=f"{col}에 포함될 텍스트 입력"
+            )
+            if keyword:
+                mask &= str_series.str.contains(keyword, na=False, case=False)
+
+    return df[mask]
+
+def render_modern_table(df):
+    """실거래 리스트를 모던 HTML 테이블로 렌더링"""
+    if df is None or df.empty:
+        st.info("표시할 데이터가 없습니다.")
+        return
+
+    safe_df = df.copy().fillna("")
+    headers = "".join(f"<th>{html.escape(str(c))}</th>" for c in safe_df.columns)
+    rows = []
+    for row in safe_df.itertuples(index=False, name=None):
+        cells = "".join(f"<td>{html.escape(str(v))}</td>" for v in row)
+        rows.append(f"<tr>{cells}</tr>")
+    body = "".join(rows)
+
+    st.markdown(
+        f"""
+        <div class="modern-table-wrap">
+            <table class="modern-table">
+                <thead><tr>{headers}</tr></thead>
+                <tbody>{body}</tbody>
+            </table>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 # --- 사이드바 ---
 with st.sidebar:
@@ -276,6 +426,7 @@ if run_query:
                             df = df.sort_values(by=sort_cols, ascending=False).reset_index(drop=True)
                         
                         st.session_state.df = df
+                        st.session_state.df_nonce += 1
                         st.session_state.region_name = full_region_name
                         st.session_state.trade_type_val = trade_type
                         
@@ -369,41 +520,42 @@ if st.session_state.df is not None:
                 st.session_state.filter_floors = sel_floors
                 filtered_df = filtered_df[filtered_df['층_num'].isin(sel_floors)]
 
+    # 가공용 컬럼 제거 후 리스트 전체 컬럼 필터를 적용
+    fixed_exclude = ['index', 'sggCd', 'umdNm', 'jibun', 'buildYear', 'aptSeq', 'umdCd', 'landCd', 'bonbun', 'bubun', 'cdealType', 'cdealDay', 'estateAgengSggNm', 'buerGbn']
+    road_exclude = [c for c in filtered_df.columns if str(c).startswith('road')]
+    internal_exclude = [c for c in filtered_df.columns if str(c).endswith('_num')]
+    all_drop_cols = list(set(fixed_exclude + road_exclude + internal_exclude))
+    actual_drop_cols = [c for c in all_drop_cols if c in filtered_df.columns]
+
+    disp_df_base = filtered_df.drop(columns=actual_drop_cols)
+    disp_df = apply_all_column_filters(disp_df_base, key_prefix=f"list_filter_{st.session_state.df_nonce}")
+
+    # 리스트 필터 결과 인덱스를 원본 필터 결과에 매핑해 지표도 동일 기준으로 계산
+    metric_df = filtered_df.loc[disp_df.index] if not disp_df.empty else filtered_df.iloc[0:0]
+
     # --- 핵심 지표 및 데이터 출력 ---
-    if not filtered_df.empty:
+    if not metric_df.empty:
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("📊 총 거래", f"{len(filtered_df):,}건")
+        m1.metric("📊 총 거래", f"{len(metric_df):,}건")
         
         if current_type == "매매":
-            if '매매가_num' in filtered_df.columns:
-                m2.metric("📉 평균 매매", f"{filtered_df['매매가_num'].mean():,.0f}만")
-                m3.metric("📈 최고 매매", f"{filtered_df['매매가_num'].max():,.0f}만")
+            if '매매가_num' in metric_df.columns:
+                m2.metric("📉 평균 매매", f"{metric_df['매매가_num'].mean():,.0f}만")
+                m3.metric("📈 최고 매매", f"{metric_df['매매가_num'].max():,.0f}만")
         else:
-            if '보증금_num' in filtered_df.columns:
-                m2.metric("📉 평균 보증금", f"{filtered_df['보증금_num'].mean():,.0f}만")
-            if '월세_num' in filtered_df.columns:
-                m3.metric("💵 평균 월세", f"{filtered_df['월세_num'].mean():,.0f}만")
+            if '보증금_num' in metric_df.columns:
+                m2.metric("📉 평균 보증금", f"{metric_df['보증금_num'].mean():,.0f}만")
+            if '월세_num' in metric_df.columns:
+                m3.metric("💵 평균 월세", f"{metric_df['월세_num'].mean():,.0f}만")
         
-        if '전용면적_num' in filtered_df.columns:
-            m4.metric("📐 평균 면적", f"{filtered_df['전용면적_num'].mean():,.1f}㎡")
+        if '전용면적_num' in metric_df.columns:
+            m4.metric("📐 평균 면적", f"{metric_df['전용면적_num'].mean():,.1f}㎡")
         
         st.divider()
         
-        # 가공용 컬럼 제거 후 최종 리스트 출력
+        # 최종 리스트 출력
         st.subheader("📋 실거래 내역 리스트")
-        
-        # 사용자 요청에 따라 특정 컬럼 및 road로 시작하는 컬럼 제외
-        fixed_exclude = ['index', 'sggCd', 'umdNm', 'jibun', 'buildYear', 'aptSeq', 'umdCd', 'landCd', 'bonbun', 'bubun', 'cdealType', 'cdealDay', 'estateAgengSggNm', 'buerGbn']
-        road_exclude = [c for c in filtered_df.columns if str(c).startswith('road')]
-        internal_exclude = [c for c in filtered_df.columns if str(c).endswith('_num')]
-        
-        all_drop_cols = list(set(fixed_exclude + road_exclude + internal_exclude))
-        actual_drop_cols = [c for c in all_drop_cols if c in filtered_df.columns]
-        
-        disp_df = filtered_df.drop(columns=actual_drop_cols)
-        
-        # hide_index=True를 추가하여 인덱스 컬럼을 숨김
-        st.dataframe(disp_df, use_container_width=True, height=550, hide_index=True)
+        render_modern_table(disp_df)
         
         # 다운로드 버튼
         csv = disp_df.to_csv(index=False).encode('utf-8-sig')
