@@ -338,6 +338,51 @@ def to_supply_pyeong_band(area_m2):
         return None
     return min(SUPPLY_BAND_CENTERS.keys(), key=lambda k: abs(SUPPLY_BAND_CENTERS[k] - est))
 
+def apply_apt_keyword_filter(df, expr):
+    """아파트 키워드 조건식(AND/OR/NOT)을 적용"""
+    if df is None or df.empty or '아파트' not in df.columns:
+        return df
+    if not expr or not str(expr).strip():
+        return df
+
+    q = str(expr).strip()
+    q = re.sub(r'\s+(?i:or)\s+', '|', q)
+    q = re.sub(r'\s+(?i:and)\s+', '&', q)
+    groups = [g.strip() for g in q.split('|') if g.strip()]
+    if not groups:
+        return df
+
+    name_series = df['아파트'].astype(str)
+    final_mask = pd.Series(False, index=df.index)
+
+    for g in groups:
+        terms = [t.strip() for t in re.split(r'&', g) if t.strip()]
+        include_terms = []
+        exclude_terms = []
+
+        for t in terms:
+            t_clean = t.strip()
+            if t_clean.startswith('-') or t_clean.startswith('!'):
+                word = t_clean[1:].strip()
+                if word:
+                    exclude_terms.append(word)
+            elif re.match(r'(?i)^not\s+', t_clean):
+                word = re.sub(r'(?i)^not\s+', '', t_clean).strip()
+                if word:
+                    exclude_terms.append(word)
+            else:
+                include_terms.append(t_clean)
+
+        group_mask = pd.Series(True, index=df.index)
+        for w in include_terms:
+            group_mask &= name_series.str.contains(w, na=False, case=False)
+        for w in exclude_terms:
+            group_mask &= ~name_series.str.contains(w, na=False, case=False)
+
+        final_mask |= group_mask
+
+    return df[final_mask]
+
 def apply_all_column_filters(df, key_prefix):
     """출력용 데이터프레임의 모든 컬럼에 대해 동적 필터 적용"""
     if df is None or df.empty:
@@ -548,165 +593,109 @@ def render_trade_type_chart(df, trade_type):
         return max(0, v_min - pad), v_max + pad
 
     if trade_type == "전월세":
-        if '보증금_num' not in base.columns or '월세_num' not in base.columns:
+        metric_options = []
+        if '보증금_num' in base.columns:
+            metric_options.append(("보증금", "보증금_num", "보증금(만원)"))
+        if '월세_num' in base.columns:
+            metric_options.append(("월세", "월세_num", "월세(만원)"))
+        if not metric_options:
             st.info("전월세 차트를 위한 보증금/월세 데이터가 부족합니다.")
             return
 
-        monthly = (
-            base.groupby('period', as_index=False)
-            .agg(
-                보증금=('보증금_num', 'mean'),
-                월세=('월세_num', 'mean'),
-                거래건수=('period', 'count')
-            )
-            .sort_values('period')
+        metric_map = {label: (col, y_name) for label, col, y_name in metric_options}
+        metric_choice = st.radio(
+            "전월세 차트 지표",
+            options=[m[0] for m in metric_options],
+            horizontal=True,
+            key="rental_chart_metric"
         )
-        x_data = monthly['period'].tolist()
-        dep_month_avg = monthly['보증금'].round(1).tolist()
-        rent_month_avg = monthly['월세'].round(1).tolist()
-        cnt_month = monthly['거래건수'].tolist()
-        dep_min, dep_max = axis_bounds(dep_month_avg, 0.12)
-        rent_min, rent_max = axis_bounds(rent_month_avg, 0.12)
-        cnt_min, cnt_max = axis_bounds(cnt_month, 0.2)
-
-        line = Line()
-        line.add_xaxis(x_data)
-        line.add_yaxis(
-            "보증금(월평균)",
-            dep_month_avg,
-            yaxis_index=0,
-            is_smooth=True,
-            symbol="none",
-            label_opts=opts.LabelOpts(is_show=False),
-            linestyle_opts=opts.LineStyleOpts(width=2.8, color="#1d4ed8"),
-        )
-        line.extend_axis(
-            yaxis=opts.AxisOpts(
-                name="월세(만원)",
-                type_="value",
-                position="right",
-                min_=rent_min,
-                max_=rent_max,
-                axislabel_opts=opts.LabelOpts(formatter="{value}"),
-            )
-        )
-        line.add_yaxis(
-            "월세(월평균)",
-            rent_month_avg,
-            yaxis_index=1,
-            is_smooth=True,
-            symbol="none",
-            label_opts=opts.LabelOpts(is_show=False),
-            linestyle_opts=opts.LineStyleOpts(width=2.8, color="#ea580c"),
-        )
-        line.extend_axis(
-            yaxis=opts.AxisOpts(
-                name="거래건수(건)",
-                type_="value",
-                position="right",
-                offset=58,
-                min_=cnt_min,
-                max_=cnt_max,
-                axislabel_opts=opts.LabelOpts(formatter="{value}"),
-            )
-        )
-
-        bar = Bar()
-        bar.add_xaxis(x_data)
-        bar.add_yaxis(
-            "월별 거래건수",
-            cnt_month,
-            yaxis_index=2,
-            bar_width="60%",
-            category_gap="78%",
-            label_opts=opts.LabelOpts(is_show=False),
-            itemstyle_opts=opts.ItemStyleOpts(color="rgba(148, 163, 184, 0.20)"),
-        )
-
-        line.overlap(bar)
-        line.set_global_opts(
-            title_opts=opts.TitleOpts(title="월평균 추세 + 월별 거래건수 (전월세)", subtitle="실거래 리스트 필터 결과 기준"),
-            tooltip_opts=opts.TooltipOpts(trigger="axis"),
-            legend_opts=opts.LegendOpts(pos_top="4%"),
-            xaxis_opts=opts.AxisOpts(type_="category", boundary_gap=False),
-            yaxis_opts=opts.AxisOpts(
-                name="보증금(만원)",
-                type_="value",
-                position="left",
-                min_=dep_min,
-                max_=dep_max,
-                axislabel_opts=opts.LabelOpts(formatter="{value}")
-            ),
-            datazoom_opts=[
-                opts.DataZoomOpts(type_="inside", range_start=0, range_end=100),
-                opts.DataZoomOpts(type_="slider", range_start=0, range_end=100)
-            ],
-        )
-        st_pyecharts(line, height="500px")
+        value_col, y_axis_name = metric_map[metric_choice]
     else:
         if '매매가_num' not in base.columns:
             st.info("매매 차트를 위한 매매가 데이터가 부족합니다.")
             return
+        value_col, y_axis_name = "매매가_num", "매매가(만원)"
+        metric_choice = "매매가"
 
-        monthly = (
-            base.groupby('period', as_index=False)
-            .agg(
-                매매가=('매매가_num', 'mean'),
-                거래건수=('period', 'count')
-            )
-            .sort_values('period')
-        )
-        x_data = monthly['period'].tolist()
-        deal_month_avg = monthly['매매가'].round(1).tolist()
-        cnt_month = monthly['거래건수'].tolist()
-        deal_min, deal_max = axis_bounds(deal_month_avg, 0.12)
-        cnt_min, cnt_max = axis_bounds(cnt_month, 0.2)
+    monthly_cnt = (
+        base.groupby('period', as_index=False)
+        .agg(거래건수=('period', 'count'))
+        .sort_values('period')
+    )
+    x_data = monthly_cnt['period'].tolist()
+    cnt_month = monthly_cnt['거래건수'].tolist()
+    cnt_min, cnt_max = axis_bounds(cnt_month, 0.2)
 
-        line = Line()
-        line.add_xaxis(x_data)
+    apt_series = pd.Series(["전체"] * len(base), index=base.index)
+    if '아파트' in base.columns:
+        apt_series = base['아파트'].astype(str).replace("nan", "").replace("", "미상")
+    base = base.assign(_apt=apt_series)
+    apt_names = [n for n in sorted(base['_apt'].dropna().unique().tolist()) if str(n).strip() != ""]
+    multi_apt = len(apt_names) >= 2
+
+    apt_monthly = (
+        base.groupby(['period', '_apt'], as_index=False)
+        .agg(value=(value_col, 'mean'))
+    )
+    pivot = apt_monthly.pivot(index='period', columns='_apt', values='value').reindex(x_data)
+
+    all_values = []
+    line = Line()
+    line.add_xaxis(x_data)
+    for apt in pivot.columns.tolist():
+        values = pivot[apt].round(1).tolist()
+        all_values.extend([v for v in values if pd.notna(v)])
+        values = [None if pd.isna(v) else float(v) for v in values]
         line.add_yaxis(
-            "매매가(월평균)",
-            deal_month_avg,
+            f"{apt}",
+            values,
             is_smooth=True,
             symbol="none",
+            connect_nones=False,
             label_opts=opts.LabelOpts(is_show=False),
-            linestyle_opts=opts.LineStyleOpts(width=3, color="#0f766e"),
-        )
-        line.extend_axis(
-            yaxis=opts.AxisOpts(
-                name="거래건수(건)",
-                type_="value",
-                position="right",
-                min_=cnt_min,
-                max_=cnt_max,
-                axislabel_opts=opts.LabelOpts(formatter="{value}"),
-            )
+            linestyle_opts=opts.LineStyleOpts(width=2.4),
         )
 
-        bar = Bar()
-        bar.add_xaxis(x_data)
-        bar.add_yaxis(
-            "월별 거래건수",
-            cnt_month,
-            yaxis_index=1,
-            bar_width="60%",
-            category_gap="78%",
-            label_opts=opts.LabelOpts(is_show=False),
-            itemstyle_opts=opts.ItemStyleOpts(color="rgba(148, 163, 184, 0.20)"),
-        )
+    val_min, val_max = axis_bounds(all_values, 0.12)
 
-        line.overlap(bar)
-        line.set_global_opts(
-            title_opts=opts.TitleOpts(title="월평균 추세 + 월별 거래건수 (매매)", subtitle="실거래 리스트 필터 결과 기준"),
-            tooltip_opts=opts.TooltipOpts(trigger="axis"),
-            xaxis_opts=opts.AxisOpts(type_="category", boundary_gap=False),
-            yaxis_opts=opts.AxisOpts(name="매매가(만원)", type_="value", min_=deal_min, max_=deal_max),
-            datazoom_opts=[
-                opts.DataZoomOpts(type_="inside", range_start=0, range_end=100),
-                opts.DataZoomOpts(type_="slider", range_start=0, range_end=100)
-            ],
+    line.extend_axis(
+        yaxis=opts.AxisOpts(
+            name="거래건수(건)",
+            type_="value",
+            position="right",
+            min_=cnt_min,
+            max_=cnt_max,
+            axislabel_opts=opts.LabelOpts(formatter="{value}"),
         )
-        st_pyecharts(line, height="500px")
+    )
+
+    bar = Bar()
+    bar.add_xaxis(x_data)
+    bar.add_yaxis(
+        "월별 거래건수",
+        cnt_month,
+        yaxis_index=1,
+        bar_width="60%",
+        category_gap="78%",
+        label_opts=opts.LabelOpts(is_show=False),
+        itemstyle_opts=opts.ItemStyleOpts(color="rgba(148, 163, 184, 0.20)"),
+    )
+
+    line.overlap(bar)
+    title = f"월평균 추세 + 월별 거래건수 ({'전월세' if trade_type == '전월세' else '매매'})"
+    subtitle = f"지표: {metric_choice} · {'아파트별 라인' if multi_apt else '단일 라인'}"
+    line.set_global_opts(
+        title_opts=opts.TitleOpts(title=title, subtitle=subtitle),
+        tooltip_opts=opts.TooltipOpts(trigger="axis"),
+        legend_opts=opts.LegendOpts(pos_top="4%", type_="scroll"),
+        xaxis_opts=opts.AxisOpts(type_="category", boundary_gap=False),
+        yaxis_opts=opts.AxisOpts(name=y_axis_name, type_="value", min_=val_min, max_=val_max),
+        datazoom_opts=[
+            opts.DataZoomOpts(type_="inside", range_start=0, range_end=100),
+            opts.DataZoomOpts(type_="slider", range_start=0, range_end=100)
+        ],
+    )
+    st_pyecharts(line, height="500px")
 
 # --- 사이드바 ---
 with st.sidebar:
@@ -742,7 +731,12 @@ with st.sidebar:
         
     start_ym = start_date.strftime("%Y%m")
     end_ym = end_date.strftime("%Y%m")
-    apt_keyword = st.text_input("🔍 아파트명 키워드", key="apt_keyword_input")
+    apt_keyword = st.text_input(
+        "🔍 아파트명 조건식",
+        key="apt_keyword_input",
+        help="예시: 래미안&잠실 | 힐스테이트 -리센츠 (AND:& 또는 and, OR:| 또는 or, 제외:-단어/!단어/not 단어)",
+        placeholder="예) 래미안&잠실 | 힐스테이트 -리센츠"
+    )
     
     st.divider()
     run_query = st.button("데이터 조회 실행", type="primary", use_container_width=True)
@@ -777,7 +771,7 @@ if run_query:
                                 df[f'{col}_num'] = df[col].apply(to_numeric_safe)
                         
                         if apt_keyword and '아파트' in df.columns:
-                            df = df[df['아파트'].str.contains(apt_keyword, na=False)]
+                            df = apply_apt_keyword_filter(df, apt_keyword)
                         
                         sort_cols = [c for c in ['년', '월', '일'] if c in df.columns]
                         if sort_cols:
