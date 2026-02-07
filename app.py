@@ -617,6 +617,13 @@ def render_trade_type_chart(df, trade_type):
         value_col, y_axis_name = "매매가_num", "매매가(만원)"
         metric_choice = "매매가"
 
+    apt_series = pd.Series(["전체"] * len(base), index=base.index)
+    if '아파트' in base.columns:
+        apt_series = base['아파트'].astype(str).replace("nan", "").replace("", "미상")
+    base = base.assign(_apt=apt_series)
+    apt_names = [n for n in sorted(base['_apt'].dropna().unique().tolist()) if str(n).strip() != ""]
+    multi_apt = len(apt_names) >= 2
+
     monthly_cnt = (
         base.groupby('period', as_index=False)
         .agg(거래건수=('period', 'count'))
@@ -625,13 +632,6 @@ def render_trade_type_chart(df, trade_type):
     x_data = monthly_cnt['period'].tolist()
     cnt_month = monthly_cnt['거래건수'].tolist()
     cnt_min, cnt_max = axis_bounds(cnt_month, 0.2)
-
-    apt_series = pd.Series(["전체"] * len(base), index=base.index)
-    if '아파트' in base.columns:
-        apt_series = base['아파트'].astype(str).replace("nan", "").replace("", "미상")
-    base = base.assign(_apt=apt_series)
-    apt_names = [n for n in sorted(base['_apt'].dropna().unique().tolist()) if str(n).strip() != ""]
-    multi_apt = len(apt_names) >= 2
 
     apt_monthly = (
         base.groupby(['period', '_apt'], as_index=False)
@@ -645,15 +645,16 @@ def render_trade_type_chart(df, trade_type):
     for apt in pivot.columns.tolist():
         values = pivot[apt].round(1).tolist()
         all_values.extend([v for v in values if pd.notna(v)])
-        values = [None if pd.isna(v) else float(v) for v in values]
+        line_values = [None if pd.isna(v) else float(v) for v in values]
+        has_missing = any(v is None for v in line_values)
         line.add_yaxis(
             f"{apt}",
-            values,
+            line_values,
             is_smooth=True,
             symbol="none",
-            is_connect_nones=False,
+            is_connect_nones=True,
             label_opts=opts.LabelOpts(is_show=False),
-            linestyle_opts=opts.LineStyleOpts(width=2.4),
+            linestyle_opts=opts.LineStyleOpts(width=2.4, type_="dashed" if has_missing else "solid"),
         )
 
     val_min, val_max = axis_bounds(all_values, 0.12)
@@ -671,15 +672,35 @@ def render_trade_type_chart(df, trade_type):
 
     bar = Bar()
     bar.add_xaxis(x_data)
-    bar.add_yaxis(
-        "월별 거래건수",
-        cnt_month,
-        yaxis_index=1,
-        bar_width="60%",
-        category_gap="78%",
-        label_opts=opts.LabelOpts(is_show=False),
-        itemstyle_opts=opts.ItemStyleOpts(color="rgba(148, 163, 184, 0.20)"),
-    )
+    if multi_apt:
+        cnt_by_apt = (
+            base.groupby(['period', '_apt'], as_index=False)
+            .agg(cnt=('period', 'count'))
+            .pivot(index='period', columns='_apt', values='cnt')
+            .reindex(x_data)
+            .fillna(0)
+        )
+        for apt in cnt_by_apt.columns.tolist():
+            bar.add_yaxis(
+                f"{apt} 거래건수",
+                cnt_by_apt[apt].astype(int).tolist(),
+                yaxis_index=1,
+                stack="apt_cnt",
+                bar_width="60%",
+                category_gap="78%",
+                label_opts=opts.LabelOpts(is_show=False),
+                itemstyle_opts=opts.ItemStyleOpts(opacity=0.28),
+            )
+    else:
+        bar.add_yaxis(
+            "월별 거래건수",
+            cnt_month,
+            yaxis_index=1,
+            bar_width="60%",
+            category_gap="78%",
+            label_opts=opts.LabelOpts(is_show=False),
+            itemstyle_opts=opts.ItemStyleOpts(color="rgba(148, 163, 184, 0.20)"),
+        )
 
     line.overlap(bar)
     title = f"월평균 추세 + 월별 거래건수 ({'전월세' if trade_type == '전월세' else '매매'})"
