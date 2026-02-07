@@ -218,6 +218,8 @@ if "filter_dep_price" not in st.session_state: st.session_state.filter_dep_price
 if "filter_rent_price" not in st.session_state: st.session_state.filter_rent_price = None
 if "filter_areas" not in st.session_state: st.session_state.filter_areas = []
 if "filter_floors" not in st.session_state: st.session_state.filter_floors = []
+if "filter_area_unit" not in st.session_state: st.session_state.filter_area_unit = "공급면적(평형대)"
+if "filter_supply_bands" not in st.session_state: st.session_state.filter_supply_bands = []
 
 @st.cache_resource
 def load_bdong_data():
@@ -284,15 +286,57 @@ SUPPLY_PYEONG_BANDS = [
     ((101, 102), "39~41평형"),
 ]
 
-def to_supply_pyeong_band(area_m2):
-    """전용면적(㎡)을 사용자 정의 공급평수 구간 라벨로 매핑"""
+SUPPLY_PYEONG_ANCHORS = [
+    (39.5, 17.0),
+    (50.0, 21.0),
+    (59.0, 25.0),
+    (73.0, 29.0),
+    (84.5, 33.5),
+    (101.5, 40.0),
+]
+
+SUPPLY_BAND_CENTERS = {
+    "16~18평형": 17.0,
+    "20~22평형": 21.0,
+    "24~26평형": 25.0,
+    "28~30평형": 29.0,
+    "32~35평형": 33.5,
+    "39~41평형": 40.0,
+}
+
+def estimate_supply_pyeong(area_m2):
+    """기준 앵커를 이용해 전용면적(㎡)을 공급평수(평)로 선형 보간/외삽"""
     if pd.isna(area_m2):
         return None
-    area_int = int(round(float(area_m2)))
-    for (min_v, max_v), label in SUPPLY_PYEONG_BANDS:
-        if min_v <= area_int <= max_v:
-            return label
-    return "기타 평형"
+
+    x = float(area_m2)
+    anchors = SUPPLY_PYEONG_ANCHORS
+
+    if x <= anchors[0][0]:
+        x0, y0 = anchors[0]
+        x1, y1 = anchors[1]
+    elif x >= anchors[-1][0]:
+        x0, y0 = anchors[-2]
+        x1, y1 = anchors[-1]
+    else:
+        x0 = y0 = x1 = y1 = None
+        for i in range(len(anchors) - 1):
+            ax0, ay0 = anchors[i]
+            ax1, ay1 = anchors[i + 1]
+            if ax0 <= x <= ax1:
+                x0, y0, x1, y1 = ax0, ay0, ax1, ay1
+                break
+
+    if x1 == x0:
+        return y0
+    return y0 + (x - x0) * (y1 - y0) / (x1 - x0)
+
+def to_supply_pyeong_band(area_m2):
+    """보간된 공급평수를 가장 가까운 평형대 라벨로 매핑"""
+    est = estimate_supply_pyeong(area_m2)
+    if est is None:
+        return None
+    return min(SUPPLY_BAND_CENTERS.keys(), key=lambda k: abs(SUPPLY_BAND_CENTERS[k] - est))
 
 def apply_all_column_filters(df, key_prefix):
     """출력용 데이터프레임의 모든 컬럼에 대해 동적 필터 적용"""
@@ -323,14 +367,14 @@ def apply_all_column_filters(df, key_prefix):
             if '전용면적' in str(col) and numeric_ratio >= 0.9 and numeric_series.notna().any():
                 unit = st.radio(
                     "표시 단위",
-                    options=["공급평수(평)", "전용면적(㎡)"],
+                    options=["공급면적(평형대)", "전용면적(㎡)"],
                     horizontal=True,
                     key=f"{key_prefix}_{safe_col}_unit"
                 )
 
-                if unit == "공급평수(평)":
+                if unit == "공급면적(평형대)":
                     converted = numeric_series.apply(to_supply_pyeong_band)
-                    band_order = [label for _, label in SUPPLY_PYEONG_BANDS] + ["기타 평형"]
+                    band_order = [label for _, label in SUPPLY_PYEONG_BANDS]
                     existing = [b for b in band_order if b in converted.dropna().unique().tolist()]
                     options = existing
                     label = "공급평형대 선택"
@@ -419,7 +463,10 @@ def reset_filter_state(key_prefix):
     st.session_state.filter_dep_price = None
     st.session_state.filter_rent_price = None
     st.session_state.filter_areas = []
+    st.session_state.filter_area_unit = "공급면적(평형대)"
+    st.session_state.filter_supply_bands = []
     st.session_state.filter_floors = []
+    st.session_state.quick_area_unit = "공급면적(평형대)"
 
     delete_keys = [k for k in st.session_state.keys() if str(k).startswith(key_prefix)]
     for k in delete_keys:
@@ -836,19 +883,44 @@ if st.session_state.df is not None:
 
             c3, c4 = st.columns(2)
             if '전용면적_num' in raw_df.columns:
-                area_list = sorted(raw_df['전용면적_num'].unique())
-
-                default_areas = st.session_state.filter_areas if st.session_state.filter_areas else area_list
-                default_areas = [a for a in default_areas if a in area_list]
-                if not default_areas:
-                    default_areas = area_list
-
                 with c3:
-                    sel_areas = st.multiselect("📐 전용면적 (㎡)", options=area_list, default=default_areas, key="ms_areas")
-                    st.session_state.filter_areas = sel_areas
-                    if len(sel_areas) != len(area_list):
-                        quick_filter_active_count += 1
-                    filtered_df = filtered_df[filtered_df['전용면적_num'].isin(sel_areas)]
+                    area_unit = st.radio(
+                        "📐 면적 기준",
+                        options=["공급면적(평형대)", "전용면적(㎡)"],
+                        horizontal=True,
+                        key="quick_area_unit"
+                    )
+                    st.session_state.filter_area_unit = area_unit
+
+                    if area_unit == "공급면적(평형대)":
+                        area_series = filtered_df['전용면적_num'].apply(to_supply_pyeong_band)
+                        band_order = [label for _, label in SUPPLY_PYEONG_BANDS]
+                        options = [b for b in band_order if b in area_series.dropna().unique().tolist()]
+
+                        default_bands = st.session_state.filter_supply_bands if st.session_state.filter_supply_bands else options
+                        default_bands = [b for b in default_bands if b in options]
+                        if not default_bands:
+                            default_bands = options
+
+                        sel_bands = st.multiselect("공급평형대 선택", options=options, default=default_bands, key="ms_supply_bands")
+                        st.session_state.filter_supply_bands = sel_bands
+                        st.session_state.filter_areas = []
+                        if len(sel_bands) != len(options):
+                            quick_filter_active_count += 1
+                        filtered_df = filtered_df[area_series.isin(sel_bands)]
+                    else:
+                        area_list = sorted(filtered_df['전용면적_num'].unique())
+                        default_areas = st.session_state.filter_areas if st.session_state.filter_areas else area_list
+                        default_areas = [a for a in default_areas if a in area_list]
+                        if not default_areas:
+                            default_areas = area_list
+
+                        sel_areas = st.multiselect("전용면적 (㎡)", options=area_list, default=default_areas, key="ms_areas")
+                        st.session_state.filter_areas = sel_areas
+                        st.session_state.filter_supply_bands = []
+                        if len(sel_areas) != len(area_list):
+                            quick_filter_active_count += 1
+                        filtered_df = filtered_df[filtered_df['전용면적_num'].isin(sel_areas)]
 
             if '층_num' in raw_df.columns:
                 floor_list = sorted(raw_df['층_num'].unique().astype(int))
