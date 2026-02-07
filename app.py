@@ -651,7 +651,7 @@ def render_trade_type_chart(df, trade_type):
             values,
             is_smooth=True,
             symbol="none",
-            connect_nones=False,
+            is_connect_nones=False,
             label_opts=opts.LabelOpts(is_show=False),
             linestyle_opts=opts.LineStyleOpts(width=2.4),
         )
