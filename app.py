@@ -275,6 +275,25 @@ def to_numeric_safe(x):
     val = re.sub(r'[^0-9.]', '', str(x))
     return float(val) if val else 0.0
 
+SUPPLY_PYEONG_BANDS = [
+    ((39, 40), "16~18평형"),
+    ((49, 51), "20~22평형"),
+    ((59, 59), "24~26평형"),
+    ((72, 74), "28~30평형"),
+    ((84, 85), "32~35평형"),
+    ((101, 102), "39~41평형"),
+]
+
+def to_supply_pyeong_band(area_m2):
+    """전용면적(㎡)을 사용자 정의 공급평수 구간 라벨로 매핑"""
+    if pd.isna(area_m2):
+        return None
+    area_int = int(round(float(area_m2)))
+    for (min_v, max_v), label in SUPPLY_PYEONG_BANDS:
+        if min_v <= area_int <= max_v:
+            return label
+    return "기타 평형"
+
 def apply_all_column_filters(df, key_prefix):
     """출력용 데이터프레임의 모든 컬럼에 대해 동적 필터 적용"""
     if df is None or df.empty:
@@ -310,13 +329,16 @@ def apply_all_column_filters(df, key_prefix):
                 )
 
                 if unit == "공급평수(평)":
-                    converted = (numeric_series / 3.3058).round(1)
-                    label = "공급평수(평) 선택"
+                    converted = numeric_series.apply(to_supply_pyeong_band)
+                    band_order = [label for _, label in SUPPLY_PYEONG_BANDS] + ["기타 평형"]
+                    existing = [b for b in band_order if b in converted.dropna().unique().tolist()]
+                    options = existing
+                    label = "공급평형대 선택"
                 else:
                     converted = numeric_series.round(1)
+                    options = sorted([v for v in converted.dropna().unique().tolist()])
                     label = "전용면적(㎡) 선택"
 
-                options = sorted([v for v in converted.dropna().unique().tolist()])
                 selected_vals = st.multiselect(
                     label,
                     options=options,
