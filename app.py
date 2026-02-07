@@ -646,7 +646,6 @@ def render_trade_type_chart(df, trade_type):
         values = pivot[apt].round(1).tolist()
         all_values.extend([v for v in values if pd.notna(v)])
         line_values = [None if pd.isna(v) else float(v) for v in values]
-        has_missing = any(v is None for v in line_values)
         line.add_yaxis(
             f"{apt}",
             line_values,
@@ -654,7 +653,7 @@ def render_trade_type_chart(df, trade_type):
             symbol="none",
             is_connect_nones=True,
             label_opts=opts.LabelOpts(is_show=False),
-            linestyle_opts=opts.LineStyleOpts(width=2.4, type_="dashed" if has_missing else "solid"),
+            linestyle_opts=opts.LineStyleOpts(width=2.4, type_="solid"),
         )
 
     val_min, val_max = axis_bounds(all_values, 0.12)
