@@ -2,3 +2,5 @@ streamlit
 pandas
 requests
 PublicDataReader
+pyecharts
+streamlit-echarts

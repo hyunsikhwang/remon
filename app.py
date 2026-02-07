@@ -4,9 +4,16 @@ from PublicDataReader import TransactionPrice, code_bdong
 import datetime
 import re
 import html
-from pyecharts import options as opts
-from pyecharts.charts import Line
-from streamlit_echarts import st_pyecharts
+try:
+    from pyecharts import options as opts
+    from pyecharts.charts import Line
+    from streamlit_echarts import st_pyecharts
+    HAS_PYECHARTS = True
+except ModuleNotFoundError:
+    opts = None
+    Line = None
+    st_pyecharts = None
+    HAS_PYECHARTS = False
 
 # --- 페이지 설정 ---
 st.set_page_config(
@@ -421,6 +428,10 @@ def make_period_frame(df):
 
 def render_trade_type_chart(df, trade_type):
     """거래유형별 기간-가격 상관 차트 렌더링 (pyecharts)"""
+    if not HAS_PYECHARTS:
+        st.error("차트 라이브러리(pyecharts)가 설치되지 않았습니다. `pip install -r requirements.txt` 후 다시 실행해주세요.")
+        return
+
     base = make_period_frame(df)
     if base.empty:
         st.info("차트를 그릴 기간 데이터가 부족합니다.")
