@@ -4,6 +4,9 @@ from PublicDataReader import TransactionPrice, code_bdong
 import datetime
 import re
 import html
+from pyecharts import options as opts
+from pyecharts.charts import Line
+from streamlit_echarts import st_pyecharts
 
 # --- 페이지 설정 ---
 st.set_page_config(
@@ -149,15 +152,18 @@ st.markdown("""
         background: #f8fafc;
         color: #374151;
         text-align: left;
-        padding: 0.8rem 0.9rem;
+        padding: 0.64rem 0.82rem;
         border-bottom: 1px solid #e5e7eb;
         font-weight: 600;
         white-space: nowrap;
+        font-size: 0.85rem;
     }
     .modern-table tbody td {
-        padding: 0.78rem 0.9rem;
+        padding: 0.52rem 0.82rem;
         border-bottom: 1px solid #f1f3f5;
         white-space: nowrap;
+        font-size: 0.84rem;
+        line-height: 1.25;
     }
     .modern-table tbody tr:hover td {
         background: #f8fafc;
@@ -386,6 +392,135 @@ def render_modern_table(df):
         """,
         unsafe_allow_html=True
     )
+
+def make_period_frame(df):
+    """거래일 기준 월 단위 집계 프레임 생성"""
+    if df is None or df.empty:
+        return pd.DataFrame()
+    if not all(c in df.columns for c in ['년', '월']):
+        return pd.DataFrame()
+
+    work = df.copy()
+    if '일' in work.columns:
+        day_vals = pd.to_numeric(work['일'], errors='coerce').fillna(1).astype(int)
+    else:
+        day_vals = pd.Series(1, index=work.index)
+
+    date_str = (
+        pd.to_numeric(work['년'], errors='coerce').fillna(0).astype(int).astype(str).str.zfill(4) + "-" +
+        pd.to_numeric(work['월'], errors='coerce').fillna(0).astype(int).astype(str).str.zfill(2) + "-" +
+        day_vals.astype(str).str.zfill(2)
+    )
+    work['deal_date'] = pd.to_datetime(date_str, errors='coerce')
+    work = work.dropna(subset=['deal_date']).sort_values('deal_date')
+    if work.empty:
+        return pd.DataFrame()
+
+    work['period'] = work['deal_date'].dt.to_period('M').astype(str)
+    return work
+
+def render_trade_type_chart(df, trade_type):
+    """거래유형별 기간-가격 상관 차트 렌더링 (pyecharts)"""
+    base = make_period_frame(df)
+    if base.empty:
+        st.info("차트를 그릴 기간 데이터가 부족합니다.")
+        return
+
+    if trade_type == "전월세":
+        if '보증금_num' not in base.columns or '월세_num' not in base.columns:
+            st.info("전월세 차트를 위한 보증금/월세 데이터가 부족합니다.")
+            return
+
+        agg = (
+            base.groupby('period', as_index=False)
+            .agg(보증금=('보증금_num', 'mean'), 월세=('월세_num', 'mean'))
+        )
+        x_data = agg['period'].tolist()
+        dep_data = [round(v, 1) for v in agg['보증금'].tolist()]
+        rent_data = [round(v, 1) for v in agg['월세'].tolist()]
+
+        line = Line()
+        line.add_xaxis(x_data)
+        line.add_yaxis(
+            "평균 보증금(만원)",
+            dep_data,
+            yaxis_index=0,
+            is_smooth=True,
+            symbol="circle",
+            symbol_size=6,
+            label_opts=opts.LabelOpts(is_show=False),
+            linestyle_opts=opts.LineStyleOpts(width=3, color="#2563eb"),
+        )
+        line.extend_axis(
+            yaxis=opts.AxisOpts(
+                name="월세(만원)",
+                type_="value",
+                position="right",
+                axislabel_opts=opts.LabelOpts(formatter="{value}"),
+            )
+        )
+        line.add_yaxis(
+            "평균 월세(만원)",
+            rent_data,
+            yaxis_index=1,
+            is_smooth=True,
+            symbol="circle",
+            symbol_size=6,
+            label_opts=opts.LabelOpts(is_show=False),
+            linestyle_opts=opts.LineStyleOpts(width=3, color="#f97316"),
+        )
+        line.set_global_opts(
+            title_opts=opts.TitleOpts(title="기간 vs 보증금/월세 추이", subtitle="실거래 리스트 필터 결과 기준 월평균"),
+            tooltip_opts=opts.TooltipOpts(trigger="axis"),
+            legend_opts=opts.LegendOpts(pos_top="4%"),
+            xaxis_opts=opts.AxisOpts(type_="category", boundary_gap=False),
+            yaxis_opts=opts.AxisOpts(
+                name="보증금(만원)",
+                type_="value",
+                position="left",
+                axislabel_opts=opts.LabelOpts(formatter="{value}")
+            ),
+            datazoom_opts=[
+                opts.DataZoomOpts(type_="inside", range_start=0, range_end=100),
+                opts.DataZoomOpts(type_="slider", range_start=0, range_end=100)
+            ],
+        )
+        st_pyecharts(line, height="460px")
+    else:
+        if '매매가_num' not in base.columns:
+            st.info("매매 차트를 위한 매매가 데이터가 부족합니다.")
+            return
+
+        agg = (
+            base.groupby('period', as_index=False)
+            .agg(매매가=('매매가_num', 'mean'))
+        )
+        x_data = agg['period'].tolist()
+        deal_data = [round(v, 1) for v in agg['매매가'].tolist()]
+
+        line = Line()
+        line.add_xaxis(x_data)
+        line.add_yaxis(
+            "평균 매매가(만원)",
+            deal_data,
+            is_smooth=True,
+            symbol="circle",
+            symbol_size=7,
+            label_opts=opts.LabelOpts(is_show=False),
+            linestyle_opts=opts.LineStyleOpts(width=3, color="#0f766e"),
+            areastyle_opts=opts.AreaStyleOpts(opacity=0.14, color="#14b8a6"),
+        )
+        line.set_global_opts(
+            title_opts=opts.TitleOpts(title="기간 vs 매매가 추이", subtitle="실거래 리스트 필터 결과 기준 월평균"),
+            tooltip_opts=opts.TooltipOpts(trigger="axis"),
+            xaxis_opts=opts.AxisOpts(type_="category", boundary_gap=False),
+            yaxis_opts=opts.AxisOpts(name="매매가(만원)", type_="value"),
+            datazoom_opts=[
+                opts.DataZoomOpts(type_="inside", range_start=0, range_end=100),
+                opts.DataZoomOpts(type_="slider", range_start=0, range_end=100)
+            ],
+        )
+        st_pyecharts(line, height="460px")
 
 # --- 사이드바 ---
 with st.sidebar:
@@ -618,6 +753,10 @@ if st.session_state.df is not None:
         if '전용면적_num' in metric_df.columns:
             m4.metric("📐 평균 면적", f"{metric_df['전용면적_num'].mean():,.1f}㎡")
         
+        st.divider()
+
+        st.subheader("📈 기간별 거래 추이")
+        render_trade_type_chart(metric_df, current_type)
         st.divider()
         
         # 최종 리스트 출력
