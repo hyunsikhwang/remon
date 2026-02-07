@@ -165,6 +165,20 @@ st.markdown("""
     .modern-table tbody tr:last-child td {
         border-bottom: none;
     }
+
+    /* Filter Studio 미니멀 스타일 */
+    [data-testid="stExpander"] {
+        border: 1px solid #eceff3 !important;
+        border-radius: 12px !important;
+        background: #ffffff !important;
+    }
+    [data-testid="stExpander"] summary {
+        font-weight: 600;
+        color: #1f2937;
+    }
+    [data-testid="stTabs"] [role="tab"] {
+        border-radius: 8px !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -250,84 +264,102 @@ def to_numeric_safe(x):
 def apply_all_column_filters(df, key_prefix):
     """출력용 데이터프레임의 모든 컬럼에 대해 동적 필터 적용"""
     if df is None or df.empty:
-        return df
+        return df, 0
 
-    st.markdown("**🔎 리스트 전체 컬럼 필터**")
     selected_cols = st.multiselect(
-        "필터할 컬럼 선택",
+        "필터 컬럼",
         options=list(df.columns),
         default=[],
         key=f"{key_prefix}_selected_cols"
     )
 
     if not selected_cols:
-        return df
+        return df, 0
 
     mask = pd.Series(True, index=df.index)
+    active_count = 0
     for col in selected_cols:
-        series = df[col]
-        safe_col = re.sub(r'[^0-9a-zA-Z_가-힣]', '_', str(col))
+        with st.expander(f"조건 설정: {col}", expanded=False):
+            series = df[col]
+            safe_col = re.sub(r'[^0-9a-zA-Z_가-힣]', '_', str(col))
 
-        numeric_series = pd.to_numeric(series, errors='coerce')
-        numeric_ratio = numeric_series.notna().mean() if len(series) else 0
+            numeric_series = pd.to_numeric(series, errors='coerce')
+            numeric_ratio = numeric_series.notna().mean() if len(series) else 0
 
-        # 숫자로 해석 가능한 컬럼은 범위 필터 제공
-        if numeric_ratio >= 0.9 and numeric_series.notna().any():
-            min_v = float(numeric_series.min())
-            max_v = float(numeric_series.max())
+            # 숫자로 해석 가능한 컬럼은 범위 필터 제공
+            if numeric_ratio >= 0.9 and numeric_series.notna().any():
+                min_v = float(numeric_series.min())
+                max_v = float(numeric_series.max())
 
-            if min_v == max_v:
-                st.caption(f"`{col}`: 단일 값({min_v:g})만 존재하여 필터를 생략합니다.")
+                if min_v == max_v:
+                    st.caption(f"단일 값({min_v:g})만 존재합니다.")
+                    continue
+
+                is_int_like = (numeric_series.dropna() % 1 == 0).all()
+                if is_int_like:
+                    slider_min = int(min_v)
+                    slider_max = int(max_v)
+                    step = 1 if slider_max - slider_min <= 200 else max(1, (slider_max - slider_min) // 200)
+                    selected_range = st.slider(
+                        f"{col} 범위",
+                        min_value=slider_min,
+                        max_value=slider_max,
+                        value=(slider_min, slider_max),
+                        step=step,
+                        key=f"{key_prefix}_{safe_col}_range"
+                    )
+                else:
+                    selected_range = st.slider(
+                        f"{col} 범위",
+                        min_value=min_v,
+                        max_value=max_v,
+                        value=(min_v, max_v),
+                        key=f"{key_prefix}_{safe_col}_range"
+                    )
+
+                if selected_range[0] > min_v or selected_range[1] < max_v:
+                    active_count += 1
+                mask &= numeric_series.between(selected_range[0], selected_range[1], inclusive='both')
                 continue
 
-            is_int_like = (numeric_series.dropna() % 1 == 0).all()
-            if is_int_like:
-                slider_min = int(min_v)
-                slider_max = int(max_v)
-                step = 1 if slider_max - slider_min <= 200 else max(1, (slider_max - slider_min) // 200)
-                selected_range = st.slider(
-                    f"{col} 범위",
-                    min_value=slider_min,
-                    max_value=slider_max,
-                    value=(slider_min, slider_max),
-                    step=step,
-                    key=f"{key_prefix}_{safe_col}_range"
+            # 문자열 컬럼은 고유값 수에 따라 다중선택/부분검색 제공
+            str_series = series.astype(str)
+            unique_vals = sorted([v for v in str_series.dropna().unique().tolist() if v != "nan"])
+
+            if len(unique_vals) <= 100:
+                selected_vals = st.multiselect(
+                    f"{col} 값 선택",
+                    options=unique_vals,
+                    default=unique_vals,
+                    key=f"{key_prefix}_{safe_col}_values"
                 )
+                if len(selected_vals) != len(unique_vals):
+                    active_count += 1
+                mask &= str_series.isin(selected_vals)
             else:
-                selected_range = st.slider(
-                    f"{col} 범위",
-                    min_value=min_v,
-                    max_value=max_v,
-                    value=(min_v, max_v),
-                    key=f"{key_prefix}_{safe_col}_range"
+                keyword = st.text_input(
+                    f"{col} 부분검색",
+                    value="",
+                    key=f"{key_prefix}_{safe_col}_keyword",
+                    placeholder=f"{col}에 포함될 텍스트 입력"
                 )
+                if keyword:
+                    active_count += 1
+                    mask &= str_series.str.contains(keyword, na=False, case=False)
 
-            mask &= numeric_series.between(selected_range[0], selected_range[1], inclusive='both')
-            continue
+    return df[mask], active_count
 
-        # 문자열 컬럼은 고유값 수에 따라 다중선택/부분검색 제공
-        str_series = series.astype(str)
-        unique_vals = sorted([v for v in str_series.dropna().unique().tolist() if v != "nan"])
+def reset_filter_state(key_prefix):
+    """기본 필터/동적 컬럼 필터 상태 초기화"""
+    st.session_state.filter_deal_price = None
+    st.session_state.filter_dep_price = None
+    st.session_state.filter_rent_price = None
+    st.session_state.filter_areas = []
+    st.session_state.filter_floors = []
 
-        if len(unique_vals) <= 100:
-            selected_vals = st.multiselect(
-                f"{col} 값 선택",
-                options=unique_vals,
-                default=unique_vals,
-                key=f"{key_prefix}_{safe_col}_values"
-            )
-            mask &= str_series.isin(selected_vals)
-        else:
-            keyword = st.text_input(
-                f"{col} 부분검색",
-                value="",
-                key=f"{key_prefix}_{safe_col}_keyword",
-                placeholder=f"{col}에 포함될 텍스트 입력"
-            )
-            if keyword:
-                mask &= str_series.str.contains(keyword, na=False, case=False)
-
-    return df[mask]
+    delete_keys = [k for k in st.session_state.keys() if str(k).startswith(key_prefix)]
+    for k in delete_keys:
+        del st.session_state[k]
 
 def render_modern_table(df):
     """실거래 리스트를 모던 HTML 테이블로 렌더링"""
@@ -376,9 +408,14 @@ with st.sidebar:
     region_input = st.text_input("📍 지역명 (시군구)", value="송파구", key="region_input_text")
     
     today = datetime.date.today()
+    try:
+        default_start_date = today.replace(year=today.year - 1)
+    except ValueError:
+        # 윤년 2/29인 경우 1년 전 2/28로 보정
+        default_start_date = today.replace(year=today.year - 1, day=28)
     col1, col2 = st.columns(2)
     with col1:
-        start_date = st.date_input("🗓️ 시작월", value=datetime.date(today.year, today.month, 1) - datetime.timedelta(days=90), key="start_date_input")
+        start_date = st.date_input("🗓️ 시작월", value=default_start_date, key="start_date_input")
     with col2:
         end_date = st.date_input("🗓️ 종료월", value=today, key="end_date_input")
         
@@ -452,73 +489,10 @@ if st.session_state.df is not None:
     </div>
     """, unsafe_allow_html=True)
     
-    # --- 상세 필터 판넬 ---
-    with st.container(border=True):
-        st.markdown("**🛠️ 상세 필터링**")
-        filtered_df = raw_df.copy()
-        
-        c1, c2 = st.columns(2)
-        if current_type == "매매":
-            if '매매가_num' in raw_df.columns:
-                min_v, max_v = int(raw_df['매매가_num'].min()), int(raw_df['매매가_num'].max())
-                if min_v == max_v: max_v += 1000
-                
-                default_val = st.session_state.filter_deal_price if st.session_state.filter_deal_price else (min_v, max_v)
-                default_val = (max(min_v, default_val[0]), min(max_v, default_val[1]))
-                
-                with c1:
-                    deal_sel = st.slider("💰 매매가 (만원)", min_v, max_v, default_val, step=1000, key="slider_deal")
-                    st.session_state.filter_deal_price = deal_sel
-                    filtered_df = filtered_df[filtered_df['매매가_num'].between(deal_sel[0], deal_sel[1])]
-        else:
-            with c1:
-                if '보증금_num' in raw_df.columns:
-                    min_v, max_v = int(raw_df['보증금_num'].min()), int(raw_df['보증금_num'].max())
-                    if min_v == max_v: max_v += 100
-                    
-                    default_val = st.session_state.filter_dep_price if st.session_state.filter_dep_price else (min_v, max_v)
-                    default_val = (max(min_v, default_val[0]), min(max_v, default_val[1]))
-                    
-                    dep_sel = st.slider("💰 보증금 (만원)", min_v, max_v, default_val, step=500, key="slider_dep")
-                    st.session_state.filter_dep_price = dep_sel
-                    filtered_df = filtered_df[filtered_df['보증금_num'].between(dep_sel[0], dep_sel[1])]
-            
-            with c2:
-                if '월세_num' in raw_df.columns:
-                    min_v, max_v = int(raw_df['월세_num'].min()), int(raw_df['월세_num'].max())
-                    if min_v == max_v: max_v += 10
-                    
-                    default_val = st.session_state.filter_rent_price if st.session_state.filter_rent_price else (min_v, max_v)
-                    default_val = (max(min_v, default_val[0]), min(max_v, default_val[1]))
-                    
-                    rent_sel = st.slider("💵 월세 (만원)", min_v, max_v, default_val, step=10, key="slider_rent")
-                    st.session_state.filter_rent_price = rent_sel
-                    filtered_df = filtered_df[filtered_df['월세_num'].between(rent_sel[0], rent_sel[1])]
-
-        c3, c4 = st.columns(2)
-        if '전용면적_num' in raw_df.columns:
-            area_list = sorted(raw_df['전용면적_num'].unique())
-            
-            default_areas = st.session_state.filter_areas if st.session_state.filter_areas else area_list
-            default_areas = [a for a in default_areas if a in area_list]
-            if not default_areas: default_areas = area_list
-            
-            with c3:
-                sel_areas = st.multiselect("📐 전용면적 (㎡)", options=area_list, default=default_areas, key="ms_areas")
-                st.session_state.filter_areas = sel_areas
-                filtered_df = filtered_df[filtered_df['전용면적_num'].isin(sel_areas)]
-
-        if '층_num' in raw_df.columns:
-            floor_list = sorted(raw_df['층_num'].unique().astype(int))
-            
-            default_floors = st.session_state.filter_floors if st.session_state.filter_floors else floor_list
-            default_floors = [f for f in default_floors if f in floor_list]
-            if not default_floors: default_floors = floor_list
-            
-            with c4:
-                sel_floors = st.multiselect("🏢 층수 선택", options=floor_list, default=default_floors, key="ms_floors")
-                st.session_state.filter_floors = sel_floors
-                filtered_df = filtered_df[filtered_df['층_num'].isin(sel_floors)]
+    filtered_df = raw_df.copy()
+    quick_filter_active_count = 0
+    col_filter_active_count = 0
+    filter_key_prefix = f"list_filter_{st.session_state.df_nonce}"
 
     # 가공용 컬럼 제거 후 리스트 전체 컬럼 필터를 적용
     fixed_exclude = ['index', 'sggCd', 'umdNm', 'jibun', 'buildYear', 'aptSeq', 'umdCd', 'landCd', 'bonbun', 'bubun', 'cdealType', 'cdealDay', 'estateAgengSggNm', 'buerGbn']
@@ -527,8 +501,101 @@ if st.session_state.df is not None:
     all_drop_cols = list(set(fixed_exclude + road_exclude + internal_exclude))
     actual_drop_cols = [c for c in all_drop_cols if c in filtered_df.columns]
 
-    disp_df_base = filtered_df.drop(columns=actual_drop_cols)
-    disp_df = apply_all_column_filters(disp_df_base, key_prefix=f"list_filter_{st.session_state.df_nonce}")
+    with st.expander("🎛️ Filter Studio", expanded=False):
+        h1, h2 = st.columns([0.8, 0.2])
+        with h1:
+            st.caption("필터는 접힘 상태로 유지됩니다. 필요할 때만 열어 조정하세요.")
+        with h2:
+            if st.button("초기화", use_container_width=True, key=f"btn_reset_{st.session_state.df_nonce}"):
+                reset_filter_state(filter_key_prefix)
+                st.rerun()
+
+        tab_quick, tab_columns = st.tabs(["빠른 필터", "컬럼 필터"])
+
+        with tab_quick:
+            c1, c2 = st.columns(2)
+            if current_type == "매매":
+                if '매매가_num' in raw_df.columns:
+                    min_v, max_v = int(raw_df['매매가_num'].min()), int(raw_df['매매가_num'].max())
+                    if min_v == max_v:
+                        max_v += 1000
+
+                    default_val = st.session_state.filter_deal_price if st.session_state.filter_deal_price else (min_v, max_v)
+                    default_val = (max(min_v, default_val[0]), min(max_v, default_val[1]))
+
+                    with c1:
+                        deal_sel = st.slider("💰 매매가 (만원)", min_v, max_v, default_val, step=1000, key="slider_deal")
+                        st.session_state.filter_deal_price = deal_sel
+                        if deal_sel[0] > min_v or deal_sel[1] < max_v:
+                            quick_filter_active_count += 1
+                        filtered_df = filtered_df[filtered_df['매매가_num'].between(deal_sel[0], deal_sel[1])]
+            else:
+                with c1:
+                    if '보증금_num' in raw_df.columns:
+                        min_v, max_v = int(raw_df['보증금_num'].min()), int(raw_df['보증금_num'].max())
+                        if min_v == max_v:
+                            max_v += 100
+
+                        default_val = st.session_state.filter_dep_price if st.session_state.filter_dep_price else (min_v, max_v)
+                        default_val = (max(min_v, default_val[0]), min(max_v, default_val[1]))
+
+                        dep_sel = st.slider("💰 보증금 (만원)", min_v, max_v, default_val, step=500, key="slider_dep")
+                        st.session_state.filter_dep_price = dep_sel
+                        if dep_sel[0] > min_v or dep_sel[1] < max_v:
+                            quick_filter_active_count += 1
+                        filtered_df = filtered_df[filtered_df['보증금_num'].between(dep_sel[0], dep_sel[1])]
+
+                with c2:
+                    if '월세_num' in raw_df.columns:
+                        min_v, max_v = int(raw_df['월세_num'].min()), int(raw_df['월세_num'].max())
+                        if min_v == max_v:
+                            max_v += 10
+
+                        default_val = st.session_state.filter_rent_price if st.session_state.filter_rent_price else (min_v, max_v)
+                        default_val = (max(min_v, default_val[0]), min(max_v, default_val[1]))
+
+                        rent_sel = st.slider("💵 월세 (만원)", min_v, max_v, default_val, step=10, key="slider_rent")
+                        st.session_state.filter_rent_price = rent_sel
+                        if rent_sel[0] > min_v or rent_sel[1] < max_v:
+                            quick_filter_active_count += 1
+                        filtered_df = filtered_df[filtered_df['월세_num'].between(rent_sel[0], rent_sel[1])]
+
+            c3, c4 = st.columns(2)
+            if '전용면적_num' in raw_df.columns:
+                area_list = sorted(raw_df['전용면적_num'].unique())
+
+                default_areas = st.session_state.filter_areas if st.session_state.filter_areas else area_list
+                default_areas = [a for a in default_areas if a in area_list]
+                if not default_areas:
+                    default_areas = area_list
+
+                with c3:
+                    sel_areas = st.multiselect("📐 전용면적 (㎡)", options=area_list, default=default_areas, key="ms_areas")
+                    st.session_state.filter_areas = sel_areas
+                    if len(sel_areas) != len(area_list):
+                        quick_filter_active_count += 1
+                    filtered_df = filtered_df[filtered_df['전용면적_num'].isin(sel_areas)]
+
+            if '층_num' in raw_df.columns:
+                floor_list = sorted(raw_df['층_num'].unique().astype(int))
+
+                default_floors = st.session_state.filter_floors if st.session_state.filter_floors else floor_list
+                default_floors = [f for f in default_floors if f in floor_list]
+                if not default_floors:
+                    default_floors = floor_list
+
+                with c4:
+                    sel_floors = st.multiselect("🏢 층수 선택", options=floor_list, default=default_floors, key="ms_floors")
+                    st.session_state.filter_floors = sel_floors
+                    if len(sel_floors) != len(floor_list):
+                        quick_filter_active_count += 1
+                    filtered_df = filtered_df[filtered_df['층_num'].isin(sel_floors)]
+
+        disp_df_base = filtered_df.drop(columns=actual_drop_cols)
+        with tab_columns:
+            disp_df, col_filter_active_count = apply_all_column_filters(disp_df_base, key_prefix=filter_key_prefix)
+
+    st.caption(f"활성 필터: 빠른 필터 {quick_filter_active_count}개 · 컬럼 필터 {col_filter_active_count}개 · 결과 {len(disp_df):,}건")
 
     # 리스트 필터 결과 인덱스를 원본 필터 결과에 매핑해 지표도 동일 기준으로 계산
     metric_df = filtered_df.loc[disp_df.index] if not disp_df.empty else filtered_df.iloc[0:0]
