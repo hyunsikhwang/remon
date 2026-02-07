@@ -466,20 +466,42 @@ def render_trade_type_chart(df, trade_type):
         st.info("차트를 그릴 기간 데이터가 부족합니다.")
         return
 
-    base = base.sort_values('deal_date').reset_index(drop=True)
-    x_dates = base['deal_date'].dt.strftime("%Y-%m-%d").tolist()
+    def axis_bounds(values, pad_ratio=0.08):
+        vals = [float(v) for v in values if pd.notna(v)]
+        if not vals:
+            return 0, 1
+        v_min, v_max = min(vals), max(vals)
+        if v_min == v_max:
+            pad = max(abs(v_min) * 0.1, 1.0)
+            return v_min - pad, v_max + pad
+        span = v_max - v_min
+        pad = span * pad_ratio
+        return max(0, v_min - pad), v_max + pad
 
     if trade_type == "전월세":
         if '보증금_num' not in base.columns or '월세_num' not in base.columns:
             st.info("전월세 차트를 위한 보증금/월세 데이터가 부족합니다.")
             return
 
-        dep_month_avg = base.groupby('period')['보증금_num'].transform('mean').round(1).tolist()
-        rent_month_avg = base.groupby('period')['월세_num'].transform('mean').round(1).tolist()
-        cnt_month = base.groupby('period')['period'].transform('count').tolist()
+        monthly = (
+            base.groupby('period', as_index=False)
+            .agg(
+                보증금=('보증금_num', 'mean'),
+                월세=('월세_num', 'mean'),
+                거래건수=('period', 'count')
+            )
+            .sort_values('period')
+        )
+        x_data = monthly['period'].tolist()
+        dep_month_avg = monthly['보증금'].round(1).tolist()
+        rent_month_avg = monthly['월세'].round(1).tolist()
+        cnt_month = monthly['거래건수'].tolist()
+        dep_min, dep_max = axis_bounds(dep_month_avg, 0.12)
+        rent_min, rent_max = axis_bounds(rent_month_avg, 0.12)
+        cnt_min, cnt_max = axis_bounds(cnt_month, 0.2)
 
         line = Line()
-        line.add_xaxis(x_dates)
+        line.add_xaxis(x_data)
         line.add_yaxis(
             "보증금(월평균)",
             dep_month_avg,
@@ -494,6 +516,8 @@ def render_trade_type_chart(df, trade_type):
                 name="월세(만원)",
                 type_="value",
                 position="right",
+                min_=rent_min,
+                max_=rent_max,
                 axislabel_opts=opts.LabelOpts(formatter="{value}"),
             )
         )
@@ -512,12 +536,14 @@ def render_trade_type_chart(df, trade_type):
                 type_="value",
                 position="right",
                 offset=58,
+                min_=cnt_min,
+                max_=cnt_max,
                 axislabel_opts=opts.LabelOpts(formatter="{value}"),
             )
         )
 
         bar = Bar()
-        bar.add_xaxis(x_dates)
+        bar.add_xaxis(x_data)
         bar.add_yaxis(
             "월별 거래건수",
             cnt_month,
@@ -538,6 +564,8 @@ def render_trade_type_chart(df, trade_type):
                 name="보증금(만원)",
                 type_="value",
                 position="left",
+                min_=dep_min,
+                max_=dep_max,
                 axislabel_opts=opts.LabelOpts(formatter="{value}")
             ),
             datazoom_opts=[
@@ -551,11 +579,22 @@ def render_trade_type_chart(df, trade_type):
             st.info("매매 차트를 위한 매매가 데이터가 부족합니다.")
             return
 
-        deal_month_avg = base.groupby('period')['매매가_num'].transform('mean').round(1).tolist()
-        cnt_month = base.groupby('period')['period'].transform('count').tolist()
+        monthly = (
+            base.groupby('period', as_index=False)
+            .agg(
+                매매가=('매매가_num', 'mean'),
+                거래건수=('period', 'count')
+            )
+            .sort_values('period')
+        )
+        x_data = monthly['period'].tolist()
+        deal_month_avg = monthly['매매가'].round(1).tolist()
+        cnt_month = monthly['거래건수'].tolist()
+        deal_min, deal_max = axis_bounds(deal_month_avg, 0.12)
+        cnt_min, cnt_max = axis_bounds(cnt_month, 0.2)
 
         line = Line()
-        line.add_xaxis(x_dates)
+        line.add_xaxis(x_data)
         line.add_yaxis(
             "매매가(월평균)",
             deal_month_avg,
@@ -569,12 +608,14 @@ def render_trade_type_chart(df, trade_type):
                 name="거래건수(건)",
                 type_="value",
                 position="right",
+                min_=cnt_min,
+                max_=cnt_max,
                 axislabel_opts=opts.LabelOpts(formatter="{value}"),
             )
         )
 
         bar = Bar()
-        bar.add_xaxis(x_dates)
+        bar.add_xaxis(x_data)
         bar.add_yaxis(
             "월별 거래건수",
             cnt_month,
@@ -590,7 +631,7 @@ def render_trade_type_chart(df, trade_type):
             title_opts=opts.TitleOpts(title="월평균 추세 + 월별 거래건수 (매매)", subtitle="실거래 리스트 필터 결과 기준"),
             tooltip_opts=opts.TooltipOpts(trigger="axis"),
             xaxis_opts=opts.AxisOpts(type_="category", boundary_gap=False),
-            yaxis_opts=opts.AxisOpts(name="매매가(만원)", type_="value"),
+            yaxis_opts=opts.AxisOpts(name="매매가(만원)", type_="value", min_=deal_min, max_=deal_max),
             datazoom_opts=[
                 opts.DataZoomOpts(type_="inside", range_start=0, range_end=100),
                 opts.DataZoomOpts(type_="slider", range_start=0, range_end=100)
