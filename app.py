@@ -6,12 +6,14 @@ import re
 import html
 try:
     from pyecharts import options as opts
-    from pyecharts.charts import Line
+    from pyecharts.charts import Line, Scatter, Bar
     from streamlit_echarts import st_pyecharts
     HAS_PYECHARTS = True
 except ModuleNotFoundError:
     opts = None
     Line = None
+    Scatter = None
+    Bar = None
     st_pyecharts = None
     HAS_PYECHARTS = False
 
@@ -299,6 +301,34 @@ def apply_all_column_filters(df, key_prefix):
             numeric_series = pd.to_numeric(series, errors='coerce')
             numeric_ratio = numeric_series.notna().mean() if len(series) else 0
 
+            # 전용면적은 공급평수 변환을 지원하고 멀티선택 UI 사용
+            if '전용면적' in str(col) and numeric_ratio >= 0.9 and numeric_series.notna().any():
+                unit = st.radio(
+                    "표시 단위",
+                    options=["공급평수(평)", "전용면적(㎡)"],
+                    horizontal=True,
+                    key=f"{key_prefix}_{safe_col}_unit"
+                )
+
+                if unit == "공급평수(평)":
+                    converted = (numeric_series / 3.3058).round(1)
+                    label = "공급평수(평) 선택"
+                else:
+                    converted = numeric_series.round(1)
+                    label = "전용면적(㎡) 선택"
+
+                options = sorted([v for v in converted.dropna().unique().tolist()])
+                selected_vals = st.multiselect(
+                    label,
+                    options=options,
+                    default=options,
+                    key=f"{key_prefix}_{safe_col}_area_values"
+                )
+                if len(selected_vals) != len(options):
+                    active_count += 1
+                mask &= converted.isin(selected_vals)
+                continue
+
             # 숫자로 해석 가능한 컬럼은 범위 필터 제공
             if numeric_ratio >= 0.9 and numeric_series.notna().any():
                 min_v = float(numeric_series.min())
@@ -437,32 +467,31 @@ def render_trade_type_chart(df, trade_type):
         st.info("차트를 그릴 기간 데이터가 부족합니다.")
         return
 
+    base = base.sort_values('deal_date').reset_index(drop=True)
+    x_dates = base['deal_date'].dt.strftime("%Y-%m-%d").tolist()
+
     if trade_type == "전월세":
         if '보증금_num' not in base.columns or '월세_num' not in base.columns:
             st.info("전월세 차트를 위한 보증금/월세 데이터가 부족합니다.")
             return
 
-        agg = (
-            base.groupby('period', as_index=False)
-            .agg(보증금=('보증금_num', 'mean'), 월세=('월세_num', 'mean'))
-        )
-        x_data = agg['period'].tolist()
-        dep_data = [round(v, 1) for v in agg['보증금'].tolist()]
-        rent_data = [round(v, 1) for v in agg['월세'].tolist()]
+        dep_month_avg = base.groupby('period')['보증금_num'].transform('mean').round(1).tolist()
+        rent_month_avg = base.groupby('period')['월세_num'].transform('mean').round(1).tolist()
+        cnt_month = base.groupby('period')['period'].transform('count').tolist()
+        dep_points = base['보증금_num'].round(1).tolist()
+        rent_points = base['월세_num'].round(1).tolist()
 
-        line = Line()
-        line.add_xaxis(x_data)
-        line.add_yaxis(
-            "평균 보증금(만원)",
-            dep_data,
+        scatter = Scatter()
+        scatter.add_xaxis(x_dates)
+        scatter.add_yaxis(
+            "보증금(건별)",
+            dep_points,
             yaxis_index=0,
-            is_smooth=True,
-            symbol="circle",
-            symbol_size=6,
+            symbol_size=7,
             label_opts=opts.LabelOpts(is_show=False),
-            linestyle_opts=opts.LineStyleOpts(width=3, color="#2563eb"),
+            itemstyle_opts=opts.ItemStyleOpts(color="#60a5fa", opacity=0.65),
         )
-        line.extend_axis(
+        scatter.extend_axis(
             yaxis=opts.AxisOpts(
                 name="월세(만원)",
                 type_="value",
@@ -470,18 +499,62 @@ def render_trade_type_chart(df, trade_type):
                 axislabel_opts=opts.LabelOpts(formatter="{value}"),
             )
         )
-        line.add_yaxis(
-            "평균 월세(만원)",
-            rent_data,
+        scatter.extend_axis(
+            yaxis=opts.AxisOpts(
+                name="거래건수(건)",
+                type_="value",
+                position="right",
+                offset=58,
+                axislabel_opts=opts.LabelOpts(formatter="{value}"),
+            )
+        )
+        scatter.add_yaxis(
+            "월세(건별)",
+            rent_points,
+            yaxis_index=1,
+            symbol="circle",
+            symbol_size=7,
+            label_opts=opts.LabelOpts(is_show=False),
+            itemstyle_opts=opts.ItemStyleOpts(color="#fdba74", opacity=0.75),
+        )
+
+        bar = Bar()
+        bar.add_xaxis(x_dates)
+        bar.add_yaxis(
+            "월별 거래건수",
+            cnt_month,
+            yaxis_index=2,
+            bar_width="60%",
+            category_gap="78%",
+            label_opts=opts.LabelOpts(is_show=False),
+            itemstyle_opts=opts.ItemStyleOpts(color="rgba(148, 163, 184, 0.20)"),
+        )
+
+        trend = Line()
+        trend.add_xaxis(x_dates)
+        trend.add_yaxis(
+            "보증금(월평균)",
+            dep_month_avg,
+            yaxis_index=0,
+            is_smooth=True,
+            symbol="none",
+            label_opts=opts.LabelOpts(is_show=False),
+            linestyle_opts=opts.LineStyleOpts(width=2.8, color="#1d4ed8"),
+        )
+        trend.add_yaxis(
+            "월세(월평균)",
+            rent_month_avg,
             yaxis_index=1,
             is_smooth=True,
-            symbol="circle",
-            symbol_size=6,
+            symbol="none",
             label_opts=opts.LabelOpts(is_show=False),
-            linestyle_opts=opts.LineStyleOpts(width=3, color="#f97316"),
+            linestyle_opts=opts.LineStyleOpts(width=2.8, color="#ea580c"),
         )
-        line.set_global_opts(
-            title_opts=opts.TitleOpts(title="기간 vs 보증금/월세 추이", subtitle="실거래 리스트 필터 결과 기준 월평균"),
+
+        scatter.overlap(bar)
+        scatter.overlap(trend)
+        scatter.set_global_opts(
+            title_opts=opts.TitleOpts(title="건별 산점도 + 월평균 추세선 (전월세)", subtitle="실거래 리스트 필터 결과 기준"),
             tooltip_opts=opts.TooltipOpts(trigger="axis"),
             legend_opts=opts.LegendOpts(pos_top="4%"),
             xaxis_opts=opts.AxisOpts(type_="category", boundary_gap=False),
@@ -496,33 +569,60 @@ def render_trade_type_chart(df, trade_type):
                 opts.DataZoomOpts(type_="slider", range_start=0, range_end=100)
             ],
         )
-        st_pyecharts(line, height="460px")
+        st_pyecharts(scatter, height="500px")
     else:
         if '매매가_num' not in base.columns:
             st.info("매매 차트를 위한 매매가 데이터가 부족합니다.")
             return
 
-        agg = (
-            base.groupby('period', as_index=False)
-            .agg(매매가=('매매가_num', 'mean'))
-        )
-        x_data = agg['period'].tolist()
-        deal_data = [round(v, 1) for v in agg['매매가'].tolist()]
+        deal_month_avg = base.groupby('period')['매매가_num'].transform('mean').round(1).tolist()
+        cnt_month = base.groupby('period')['period'].transform('count').tolist()
+        deal_points = base['매매가_num'].round(1).tolist()
 
-        line = Line()
-        line.add_xaxis(x_data)
-        line.add_yaxis(
-            "평균 매매가(만원)",
-            deal_data,
-            is_smooth=True,
-            symbol="circle",
+        scatter = Scatter()
+        scatter.add_xaxis(x_dates)
+        scatter.add_yaxis(
+            "매매가(건별)",
+            deal_points,
             symbol_size=7,
             label_opts=opts.LabelOpts(is_show=False),
-            linestyle_opts=opts.LineStyleOpts(width=3, color="#0f766e"),
-            areastyle_opts=opts.AreaStyleOpts(opacity=0.14, color="#14b8a6"),
+            itemstyle_opts=opts.ItemStyleOpts(color="#5eead4", opacity=0.72),
         )
-        line.set_global_opts(
-            title_opts=opts.TitleOpts(title="기간 vs 매매가 추이", subtitle="실거래 리스트 필터 결과 기준 월평균"),
+        scatter.extend_axis(
+            yaxis=opts.AxisOpts(
+                name="거래건수(건)",
+                type_="value",
+                position="right",
+                axislabel_opts=opts.LabelOpts(formatter="{value}"),
+            )
+        )
+
+        bar = Bar()
+        bar.add_xaxis(x_dates)
+        bar.add_yaxis(
+            "월별 거래건수",
+            cnt_month,
+            yaxis_index=1,
+            bar_width="60%",
+            category_gap="78%",
+            label_opts=opts.LabelOpts(is_show=False),
+            itemstyle_opts=opts.ItemStyleOpts(color="rgba(148, 163, 184, 0.20)"),
+        )
+
+        trend = Line()
+        trend.add_xaxis(x_dates)
+        trend.add_yaxis(
+            "매매가(월평균)",
+            deal_month_avg,
+            is_smooth=True,
+            symbol="none",
+            label_opts=opts.LabelOpts(is_show=False),
+            linestyle_opts=opts.LineStyleOpts(width=3, color="#0f766e"),
+        )
+        scatter.overlap(bar)
+        scatter.overlap(trend)
+        scatter.set_global_opts(
+            title_opts=opts.TitleOpts(title="건별 산점도 + 월평균 추세선 (매매)", subtitle="실거래 리스트 필터 결과 기준"),
             tooltip_opts=opts.TooltipOpts(trigger="axis"),
             xaxis_opts=opts.AxisOpts(type_="category", boundary_gap=False),
             yaxis_opts=opts.AxisOpts(name="매매가(만원)", type_="value"),
@@ -531,7 +631,7 @@ def render_trade_type_chart(df, trade_type):
                 opts.DataZoomOpts(type_="slider", range_start=0, range_end=100)
             ],
         )
-        st_pyecharts(line, height="460px")
+        st_pyecharts(scatter, height="500px")
 
 # --- 사이드바 ---
 with st.sidebar:
