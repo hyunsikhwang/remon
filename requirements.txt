@@ -4,3 +4,5 @@ requests
 PublicDataReader
 pyecharts
 streamlit-echarts
+streamlit-shadcn-ui
+streamlit-awesome-table

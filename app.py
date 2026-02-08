@@ -3,7 +3,6 @@ import pandas as pd
 from PublicDataReader import TransactionPrice, code_bdong
 import datetime
 import re
-import html
 import math
 try:
     from pyecharts import options as opts
@@ -17,6 +16,20 @@ except ModuleNotFoundError:
     st_pyecharts = None
     HAS_PYECHARTS = False
 
+try:
+    import streamlit_shadcn_ui as ui
+    HAS_SHADCN_UI = True
+except ModuleNotFoundError:
+    ui = None
+    HAS_SHADCN_UI = False
+
+try:
+    from awesome_table import AwesomeTable
+    HAS_AWESOME_TABLE = True
+except ModuleNotFoundError:
+    AwesomeTable = None
+    HAS_AWESOME_TABLE = False
+
 # --- 페이지 설정 ---
 st.set_page_config(
     page_title="Real Estate Insights",
@@ -24,19 +37,26 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- 커스텀 CSS (Value Horizon UI 스타일) ---
+# --- 커스텀 CSS (Shadcn Inspired Dashboard Theme) ---
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-
-    /* 컨테이너 최적화 */
-    .block-container {
-        padding-top: 1.5rem !important;
-        padding-bottom: 2rem !important;
-        max-width: 1100px !important;
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap');
+    :root {
+        --bg: #f4f6f8;
+        --panel: #ffffff;
+        --ink: #0f172a;
+        --muted: #64748b;
+        --line: #e2e8f0;
+        --brand: #0f766e;
+        --brand-soft: #ccfbf1;
     }
-    
-    /* 헤더 영역 투명화 및 불필요 요소 숨김 (사이드바 토글 버튼은 유지) */
+
+    .block-container {
+        padding-top: 1.1rem !important;
+        padding-bottom: 2rem !important;
+        max-width: 1220px !important;
+    }
+
     [data-testid="stHeader"] {
         background-color: rgba(0,0,0,0) !important;
     }
@@ -44,155 +64,77 @@ st.markdown("""
         display: none !important;
     }
 
-    /* 전역 스타일 */
     .stApp {
-        background-color: #ffffff;
-        color: #1a1a1a;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background:
+            radial-gradient(1300px 500px at 96% -10%, #d9f99d 0%, transparent 48%),
+            radial-gradient(900px 420px at -5% -20%, #bfdbfe 0%, transparent 46%),
+            var(--bg);
+        color: var(--ink);
+        font-family: 'Manrope', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
-    /* Hero Section */
     .hero-container {
-        padding: 2rem 0;
-        text-align: center;
-        border-bottom: 1px solid #f5f5f5;
-        margin-bottom: 2.5rem;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: linear-gradient(125deg, rgba(255,255,255,0.9) 0%, rgba(240,253,250,0.9) 100%);
+        box-shadow: 0 10px 30px rgba(2, 8, 23, 0.06);
+        padding: 1.65rem;
+        margin-bottom: 1.25rem;
     }
-
     .hero-title {
-        font-size: 2.4rem;
-        font-weight: 700;
-        color: #111111;
-        margin-bottom: 0.5rem;
-        letter-spacing: -0.8px;
+        font-size: 2rem;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        margin-bottom: 0.3rem;
     }
-
     .hero-subtitle {
-        font-size: 1rem;
-        font-weight: 400;
-        color: #666666;
+        color: var(--muted);
+        font-size: 0.95rem;
     }
 
-    /* Metric Card 스타일 수정 */
     [data-testid="stMetric"] {
-        background-color: #ffffff;
-        padding: 1.25rem;
-        border-radius: 12px;
-        border: 1px solid #eaeaea;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-        transition: all 0.2s ease;
-    }
-    
-    [data-testid="stMetric"]:hover {
-        border-color: #007aff;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        background-color: var(--panel);
+        border: 1px solid var(--line);
+        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+        border-radius: 14px;
+        padding: 1rem 1.1rem;
     }
 
-    [data-testid="stMetricLabel"] {
-        font-size: 0.85rem !important;
-        font-weight: 600 !important;
-        color: #888888 !important;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    [data-testid="stMetricValue"] {
-        font-size: 1.5rem !important;
-        font-weight: 700 !important;
-        color: #111111 !important;
-    }
-
-    /* 버튼 스타일 */
-    .stButton > button {
+    .stButton > button, button[kind="primary"] {
         width: 100%;
-        border-radius: 8px;
-        font-weight: 600;
-        background-color: #007aff;
+        border-radius: 11px;
+        font-weight: 700;
+        background-color: var(--brand);
         color: white;
-        border: none;
-        padding: 0.5rem 1rem;
-        transition: all 0.2s;
+        border: 1px solid var(--brand);
+        padding: 0.56rem 1rem;
     }
-    
-    .stButton > button:hover {
-        background-color: #0063d1;
-        box-shadow: 0 4px 8px rgba(0,122,255,0.2);
+    .stButton > button:hover, button[kind="primary"]:hover {
+        background-color: #115e59;
+        border-color: #115e59;
     }
 
-    /* 사이드바 스타일링 */
     [data-testid="stSidebar"] {
-        background-color: #fcfcfc;
-        border-right: 1px solid #f0f0f0;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        border-right: 1px solid var(--line);
     }
 
-    /* 컨테이너 보더 강제 적용 (레이아웃 버그 방지) */
     [data-testid="stVerticalBlockBorderWrapper"] {
-        border: 1px solid #eeeeee !important;
-        border-radius: 12px !important;
-        padding: 20px !important;
-        background-color: #fdfdfd !important;
-        margin-bottom: 2rem !important;
+        border: 1px solid var(--line) !important;
+        border-radius: 16px !important;
+        background: rgba(255,255,255,0.9) !important;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.03) !important;
+        padding: 1rem !important;
+        margin-bottom: 1.2rem !important;
     }
 
-    /* 위젯 간격 조정 */
-    .stSlider, .stMultiSelect {
-        margin-bottom: 1rem !important;
-    }
-
-    /* 실거래 리스트 모던 테이블 */
-    .modern-table-wrap {
-        border: 1px solid #e9ecef;
-        border-radius: 12px;
-        overflow: auto;
-        max-height: 550px;
-        background: #ffffff;
-    }
-    .modern-table {
-        width: 100%;
-        border-collapse: separate;
-        border-spacing: 0;
-        font-size: 0.9rem;
-        color: #1f2937;
-    }
-    .modern-table thead th {
-        position: sticky;
-        top: 0;
-        z-index: 2;
-        background: #f8fafc;
-        color: #374151;
-        text-align: left;
-        padding: 0.64rem 0.82rem;
-        border-bottom: 1px solid #e5e7eb;
-        font-weight: 600;
-        white-space: nowrap;
-        font-size: 0.85rem;
-    }
-    .modern-table tbody td {
-        padding: 0.52rem 0.82rem;
-        border-bottom: 1px solid #f1f3f5;
-        white-space: nowrap;
-        font-size: 0.84rem;
-        line-height: 1.25;
-    }
-    .modern-table tbody tr:hover td {
-        background: #f8fafc;
-    }
-    .modern-table tbody tr:last-child td {
-        border-bottom: none;
-    }
-
-    /* Filter Studio 미니멀 스타일 */
     [data-testid="stExpander"] {
-        border: 1px solid #eceff3 !important;
+        border: 1px solid var(--line) !important;
         border-radius: 12px !important;
         background: #ffffff !important;
     }
     [data-testid="stExpander"] summary {
-        font-weight: 600;
-        color: #1f2937;
-    }
-    [data-testid="stTabs"] [role="tab"] {
-        border-radius: 8px !important;
+        font-weight: 700;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -518,31 +460,31 @@ def reset_filter_state(key_prefix):
     for k in delete_keys:
         del st.session_state[k]
 
-def render_modern_table(df):
-    """실거래 리스트를 모던 HTML 테이블로 렌더링"""
+def render_awesome_table(df):
+    """실거래 리스트를 AwesomeTable로 렌더링"""
     if df is None or df.empty:
         st.info("표시할 데이터가 없습니다.")
         return
 
     safe_df = df.copy().fillna("")
-    headers = "".join(f"<th>{html.escape(str(c))}</th>" for c in safe_df.columns)
-    rows = []
-    for row in safe_df.itertuples(index=False, name=None):
-        cells = "".join(f"<td>{html.escape(str(v))}</td>" for v in row)
-        rows.append(f"<tr>{cells}</tr>")
-    body = "".join(rows)
+    safe_df.columns = [str(col) for col in safe_df.columns]
+    if HAS_AWESOME_TABLE:
+        try:
+            AwesomeTable(safe_df, show_order=True, show_search=True)
+            return
+        except Exception as e:
+            st.warning(f"AwesomeTable 렌더링에 실패해 기본 테이블로 대체합니다: {e}")
+    st.dataframe(safe_df, use_container_width=True, hide_index=True)
 
-    st.markdown(
-        f"""
-        <div class="modern-table-wrap">
-            <table class="modern-table">
-                <thead><tr>{headers}</tr></thead>
-                <tbody>{body}</tbody>
-            </table>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+def render_metric_card(title, content, description, key):
+    """Shadcn metric card 우선 렌더링, 미설치 시 기본 metric 사용"""
+    if HAS_SHADCN_UI:
+        try:
+            ui.metric_card(title=title, content=content, description=description, key=key)
+            return
+        except Exception:
+            pass
+    st.metric(title, content, description)
 
 def make_period_frame(df):
     """거래일 기준 월 단위 집계 프레임 생성"""
@@ -749,8 +691,8 @@ def render_trade_type_chart(df, trade_type):
 
 # --- 사이드바 ---
 with st.sidebar:
-    st.markdown('<div style="font-size: 1.5rem; font-weight: 700; color: #111111; margin-bottom: 0.5rem;">🏢 Search Portal</div>', unsafe_allow_html=True)
-    st.markdown('<div style="font-size: 0.85rem; color: #888888; margin-bottom: 1.5rem;">실거래가 데이터 조회</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size: 1.4rem; font-weight: 800; margin-bottom: 0.25rem;">Search Portal</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size: 0.85rem; color: #64748b; margin-bottom: 1.2rem;">실거래가 데이터 조회</div>', unsafe_allow_html=True)
     
     if not SECRET_KEY:
         current_key = st.text_input("🔑 API 인증키", type="password", help="공공데이터포털 API 키")
@@ -789,7 +731,10 @@ with st.sidebar:
     )
     
     st.divider()
-    run_query = st.button("데이터 조회 실행", type="primary", use_container_width=True)
+    if HAS_SHADCN_UI:
+        run_query = ui.button(text="데이터 조회 실행", key="run_query_btn")
+    else:
+        run_query = st.button("데이터 조회 실행", type="primary", use_container_width=True)
 
 # --- 조회 로직 ---
 if run_query:
@@ -993,20 +938,26 @@ if st.session_state.df is not None:
     # --- 핵심 지표 및 데이터 출력 ---
     if not metric_df.empty:
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("📊 총 거래", f"{len(metric_df):,}건")
+        with m1:
+            render_metric_card("총 거래", f"{len(metric_df):,}건", "현재 필터 결과", key="metric_total")
         
         if current_type == "매매":
             if '매매가_num' in metric_df.columns:
-                m2.metric("📉 평균 매매", f"{metric_df['매매가_num'].mean():,.0f}만")
-                m3.metric("📈 최고 매매", f"{metric_df['매매가_num'].max():,.0f}만")
+                with m2:
+                    render_metric_card("평균 매매", f"{metric_df['매매가_num'].mean():,.0f}만", "거래 단가 평균", key="metric_avg_sale")
+                with m3:
+                    render_metric_card("최고 매매", f"{metric_df['매매가_num'].max():,.0f}만", "최고 체결 금액", key="metric_max_sale")
         else:
             if '보증금_num' in metric_df.columns:
-                m2.metric("📉 평균 보증금", f"{metric_df['보증금_num'].mean():,.0f}만")
+                with m2:
+                    render_metric_card("평균 보증금", f"{metric_df['보증금_num'].mean():,.0f}만", "보증금 평균", key="metric_avg_dep")
             if '월세_num' in metric_df.columns:
-                m3.metric("💵 평균 월세", f"{metric_df['월세_num'].mean():,.0f}만")
+                with m3:
+                    render_metric_card("평균 월세", f"{metric_df['월세_num'].mean():,.0f}만", "월세 평균", key="metric_avg_rent")
         
         if '전용면적_num' in metric_df.columns:
-            m4.metric("📐 평균 면적", f"{metric_df['전용면적_num'].mean():,.1f}㎡")
+            with m4:
+                render_metric_card("평균 면적", f"{metric_df['전용면적_num'].mean():,.1f}㎡", "전용면적 평균", key="metric_avg_area")
         
         st.divider()
 
@@ -1016,7 +967,7 @@ if st.session_state.df is not None:
         
         # 최종 리스트 출력
         st.subheader("📋 실거래 내역 리스트")
-        render_modern_table(disp_df)
+        render_awesome_table(disp_df)
         
         # 다운로드 버튼
         csv = disp_df.to_csv(index=False).encode('utf-8-sig')
