@@ -1043,19 +1043,22 @@ if st.session_state.df is not None:
 
                 with c4:
                     st.markdown("🏢 층수 선택")
-                    floor_all_key = f"{filter_key_prefix}_floor_all"
-                    if floor_all_key not in st.session_state:
-                        st.session_state[floor_all_key] = (len(default_floors) == len(floor_list))
 
                     for floor in floor_list:
                         floor_key = f"{filter_key_prefix}_floor_{floor}"
                         if floor_key not in st.session_state:
                             st.session_state[floor_key] = floor in default_floors
 
-                    select_all_floors = st.checkbox("전체 선택", key=floor_all_key)
+                    btn_col1, btn_col2 = st.columns(2)
+                    select_all_floors = btn_col1.button("전체 선택", key=f"{filter_key_prefix}_floor_select_all", use_container_width=True)
+                    clear_all_floors = btn_col2.button("전체 해제", key=f"{filter_key_prefix}_floor_clear_all", use_container_width=True)
+
                     if select_all_floors:
                         for floor in floor_list:
                             st.session_state[f"{filter_key_prefix}_floor_{floor}"] = True
+                    elif clear_all_floors:
+                        for floor in floor_list:
+                            st.session_state[f"{filter_key_prefix}_floor_{floor}"] = False
 
                     floor_cols = st.columns(3)
                     sel_floors = []
@@ -1064,11 +1067,6 @@ if st.session_state.df is not None:
                             is_checked = st.checkbox(f"{floor}층", key=f"{filter_key_prefix}_floor_{floor}")
                         if is_checked:
                             sel_floors.append(floor)
-
-                    if sel_floors and len(sel_floors) != len(floor_list):
-                        st.session_state[floor_all_key] = False
-                    elif len(sel_floors) == len(floor_list):
-                        st.session_state[floor_all_key] = True
 
                     st.session_state.filter_floors = sel_floors
                     if len(sel_floors) != len(floor_list):
