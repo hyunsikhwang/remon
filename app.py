@@ -754,9 +754,12 @@ def render_trade_type_chart(df, trade_type):
     cnt_min, cnt_max = axis_bounds(cnt_month, 0.2, force_int=True)
 
     all_values = []
+    dep_values_all = []
+    rent_values_all = []
+    combined_dual_axis = trade_type == "전월세" and metric_choice == "보증금+월세"
     line = Line()
     line.add_xaxis(x_data)
-    if trade_type == "전월세" and metric_choice == "보증금+월세":
+    if combined_dual_axis:
         dep_monthly = (
             base.groupby(['period', '_apt'], as_index=False)
             .agg(value=('보증금_num', 'mean'))
@@ -771,11 +774,13 @@ def render_trade_type_chart(df, trade_type):
 
         for apt in dep_pivot.columns.tolist():
             dep_values = dep_pivot[apt].round(1).tolist()
+            dep_values_all.extend([v for v in dep_values if pd.notna(v)])
             all_values.extend([v for v in dep_values if pd.notna(v)])
             dep_line_values = [None if pd.isna(v) else float(v) for v in dep_values]
             line.add_yaxis(
                 f"{apt} 보증금",
                 dep_line_values,
+                yaxis_index=0,
                 is_smooth=True,
                 symbol="none",
                 is_connect_nones=True,
@@ -785,11 +790,13 @@ def render_trade_type_chart(df, trade_type):
 
         for apt in rent_pivot.columns.tolist():
             rent_values = rent_pivot[apt].round(1).tolist()
+            rent_values_all.extend([v for v in rent_values if pd.notna(v)])
             all_values.extend([v for v in rent_values if pd.notna(v)])
             rent_line_values = [None if pd.isna(v) else float(v) for v in rent_values]
             line.add_yaxis(
                 f"{apt} 월세",
                 rent_line_values,
+                yaxis_index=1,
                 is_smooth=True,
                 symbol="none",
                 is_connect_nones=True,
@@ -819,11 +826,30 @@ def render_trade_type_chart(df, trade_type):
 
     val_min, val_max = axis_bounds(all_values, 0.12)
 
+    cnt_axis_index = 1
+    if combined_dual_axis:
+        rent_min, rent_max = axis_bounds(rent_values_all, 0.12)
+        dep_min, dep_max = axis_bounds(dep_values_all, 0.12)
+        line.extend_axis(
+            yaxis=opts.AxisOpts(
+                name="월세(만원)",
+                type_="value",
+                position="right",
+                min_=rent_min,
+                max_=rent_max,
+                axislabel_opts=opts.LabelOpts(formatter="{value}"),
+            )
+        )
+        cnt_axis_index = 2
+    else:
+        dep_min, dep_max = val_min, val_max
+
     line.extend_axis(
         yaxis=opts.AxisOpts(
             name="거래건수(건)",
             type_="value",
             position="right",
+            offset=56 if combined_dual_axis else 0,
             min_=cnt_min,
             max_=cnt_max,
             axislabel_opts=opts.LabelOpts(formatter="{value}"),
@@ -844,7 +870,7 @@ def render_trade_type_chart(df, trade_type):
             bar.add_yaxis(
                 f"{apt} 거래건수",
                 cnt_by_apt[apt].astype(int).tolist(),
-                yaxis_index=1,
+                yaxis_index=cnt_axis_index,
                 stack="apt_cnt",
                 bar_width="60%",
                 category_gap="78%",
@@ -855,7 +881,7 @@ def render_trade_type_chart(df, trade_type):
         bar.add_yaxis(
             "월별 거래건수",
             cnt_month,
-            yaxis_index=1,
+            yaxis_index=cnt_axis_index,
             bar_width="60%",
             category_gap="78%",
             label_opts=opts.LabelOpts(is_show=False),
@@ -870,7 +896,12 @@ def render_trade_type_chart(df, trade_type):
         tooltip_opts=opts.TooltipOpts(trigger="axis"),
         legend_opts=opts.LegendOpts(pos_top="4%", type_="scroll"),
         xaxis_opts=opts.AxisOpts(type_="category", boundary_gap=False),
-        yaxis_opts=opts.AxisOpts(name=y_axis_name, type_="value", min_=val_min, max_=val_max),
+        yaxis_opts=opts.AxisOpts(
+            name="보증금(만원)" if combined_dual_axis else y_axis_name,
+            type_="value",
+            min_=dep_min,
+            max_=dep_max,
+        ),
         datazoom_opts=[
             opts.DataZoomOpts(type_="inside", range_start=0, range_end=100),
             opts.DataZoomOpts(type_="slider", range_start=0, range_end=100)
