@@ -4,6 +4,7 @@ from PublicDataReader import TransactionPrice, code_bdong
 import datetime
 import re
 import html
+import math
 try:
     from pyecharts import options as opts
     from pyecharts.charts import Line, Bar
@@ -580,17 +581,44 @@ def render_trade_type_chart(df, trade_type):
         st.info("차트를 그릴 기간 데이터가 부족합니다.")
         return
 
-    def axis_bounds(values, pad_ratio=0.08):
+    def axis_bounds(values, pad_ratio=0.08, force_int=False):
         vals = [float(v) for v in values if pd.notna(v)]
         if not vals:
             return 0, 1
         v_min, v_max = min(vals), max(vals)
         if v_min == v_max:
             pad = max(abs(v_min) * 0.1, 1.0)
-            return v_min - pad, v_max + pad
-        span = v_max - v_min
-        pad = span * pad_ratio
-        return max(0, v_min - pad), v_max + pad
+            low, high = v_min - pad, v_max + pad
+        else:
+            span = v_max - v_min
+            pad = span * pad_ratio
+            low, high = max(0, v_min - pad), v_max + pad
+
+        if force_int:
+            low = int(math.floor(low))
+            high = int(math.ceil(high))
+            if low == high:
+                high = low + 1
+            return low, high
+
+        # 부동소수점 노이즈(예: 7.14800000002) 제거용 축값 정규화
+        max_abs = max(abs(low), abs(high))
+        if max_abs >= 1000:
+            digits = 0
+        elif max_abs >= 100:
+            digits = 1
+        elif max_abs >= 10:
+            digits = 1
+        elif max_abs >= 1:
+            digits = 2
+        else:
+            digits = 3
+
+        low = round(low, digits)
+        high = round(high, digits)
+        if low == high:
+            high = round(high + (10 ** (-digits)), digits)
+        return low, high
 
     if trade_type == "전월세":
         metric_options = []
@@ -631,7 +659,7 @@ def render_trade_type_chart(df, trade_type):
     )
     x_data = monthly_cnt['period'].tolist()
     cnt_month = monthly_cnt['거래건수'].tolist()
-    cnt_min, cnt_max = axis_bounds(cnt_month, 0.2)
+    cnt_min, cnt_max = axis_bounds(cnt_month, 0.2, force_int=True)
 
     apt_monthly = (
         base.groupby(['period', '_apt'], as_index=False)
