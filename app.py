@@ -19,7 +19,7 @@ except ModuleNotFoundError:
 
 # --- 페이지 설정 ---
 st.set_page_config(
-    page_title="Premium 아파트 실거래가 대시보드",
+    page_title="Real Estate Insights",
     page_icon="🏢",
     layout="wide"
 )
