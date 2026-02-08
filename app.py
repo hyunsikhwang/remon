@@ -8,13 +8,14 @@ import math
 try:
     from pyecharts import options as opts
     from pyecharts.charts import Line, Bar
-    from streamlit_echarts import st_pyecharts
+    from streamlit_echarts import st_pyecharts, st_echarts
     HAS_PYECHARTS = True
 except ModuleNotFoundError:
     opts = None
     Line = None
     Bar = None
     st_pyecharts = None
+    st_echarts = None
     HAS_PYECHARTS = False
 
 # --- 페이지 설정 ---
@@ -570,6 +571,75 @@ def make_period_frame(df):
     work['period'] = work['deal_date'].dt.to_period('M').astype(str)
     return work
 
+def render_line_race_timeline(x_data, pivot, y_axis_name, title, subtitle, y_min, y_max):
+    """ECharts timeline 기반 line race 렌더링"""
+    if st_echarts is None:
+        st.info("현재 환경에서는 Line Race 타임라인을 지원하지 않아 기본 라인 차트로 표시됩니다.")
+        race_fallback = Line()
+        race_fallback.add_xaxis(x_data)
+        for apt in pivot.columns.tolist():
+            values = [None if pd.isna(v) else float(v) for v in pivot[apt].round(1).tolist()]
+            race_fallback.add_yaxis(
+                f"{apt}",
+                values,
+                is_smooth=True,
+                symbol="none",
+                is_connect_nones=True,
+                label_opts=opts.LabelOpts(is_show=False),
+                linestyle_opts=opts.LineStyleOpts(width=2.8),
+            )
+        race_fallback.set_global_opts(
+            title_opts=opts.TitleOpts(title=title, subtitle=subtitle),
+            tooltip_opts=opts.TooltipOpts(trigger="axis"),
+            legend_opts=opts.LegendOpts(pos_top="4%", type_="scroll"),
+            xaxis_opts=opts.AxisOpts(type_="category", boundary_gap=False),
+            yaxis_opts=opts.AxisOpts(name=y_axis_name, type_="value", min_=y_min, max_=y_max),
+        )
+        st_pyecharts(race_fallback, height="500px")
+        return
+
+    apt_names = pivot.columns.tolist()
+    timeline_options = []
+    for i, month in enumerate(x_data):
+        series = []
+        for apt in apt_names:
+            full_vals = [None if pd.isna(v) else float(v) for v in pivot[apt].round(1).tolist()]
+            frame_vals = [full_vals[j] if j <= i else None for j in range(len(full_vals))]
+            series.append(
+                {
+                    "name": str(apt),
+                    "type": "line",
+                    "smooth": True,
+                    "symbol": "none",
+                    "connectNulls": True,
+                    "lineStyle": {"width": 2.8},
+                    "data": frame_vals,
+                }
+            )
+        timeline_options.append({"title": {"subtext": f"{subtitle} · {month}"}, "series": series})
+
+    option = {
+        "baseOption": {
+            "timeline": {
+                "axisType": "category",
+                "autoPlay": True,
+                "loop": True,
+                "playInterval": 2200,
+                "data": x_data,
+                "label": {"formatter": "{value}"},
+            },
+            "title": {"text": title, "subtext": subtitle, "left": "center"},
+            "legend": {"type": "scroll", "top": 32},
+            "tooltip": {"trigger": "axis"},
+            "grid": {"left": "8%", "right": "8%", "top": 88, "bottom": 72},
+            "xAxis": {"type": "category", "boundaryGap": False, "data": x_data},
+            "yAxis": {"type": "value", "name": y_axis_name, "min": y_min, "max": y_max},
+            "series": [{"type": "line"}],
+        },
+        "options": timeline_options,
+    }
+    st_echarts(options=option, height="500px")
+
 def render_trade_type_chart(df, trade_type):
     """거래유형별 기간-가격 상관 차트 렌더링 (pyecharts)"""
     if not HAS_PYECHARTS:
@@ -681,37 +751,15 @@ def render_trade_type_chart(df, trade_type):
     val_min, val_max = axis_bounds(all_values, 0.12)
 
     if chart_mode == "Line Race":
-        race = Line()
-        race.add_xaxis(x_data)
-        for apt in pivot.columns.tolist():
-            values = pivot[apt].round(1).tolist()
-            line_values = [None if pd.isna(v) else float(v) for v in values]
-            race.add_yaxis(
-                f"{apt}",
-                line_values,
-                is_smooth=True,
-                symbol="none",
-                is_connect_nones=True,
-                label_opts=opts.LabelOpts(is_show=False),
-                linestyle_opts=opts.LineStyleOpts(width=2.8),
-                is_symbol_show=False,
-            )
-
-        race.set_global_opts(
-            title_opts=opts.TitleOpts(
-                title=f"Line Race ({'전월세' if trade_type == '전월세' else '매매'})",
-                subtitle=f"지표: {metric_choice} · 아파트별 월평균"
-            ),
-            tooltip_opts=opts.TooltipOpts(trigger="axis"),
-            legend_opts=opts.LegendOpts(pos_top="4%", type_="scroll"),
-            xaxis_opts=opts.AxisOpts(type_="category", boundary_gap=False),
-            yaxis_opts=opts.AxisOpts(name=y_axis_name, type_="value", min_=val_min, max_=val_max),
-            datazoom_opts=[
-                opts.DataZoomOpts(type_="inside", range_start=0, range_end=100),
-                opts.DataZoomOpts(type_="slider", range_start=0, range_end=100)
-            ],
+        render_line_race_timeline(
+            x_data=x_data,
+            pivot=pivot,
+            y_axis_name=y_axis_name,
+            title=f"Line Race ({'전월세' if trade_type == '전월세' else '매매'})",
+            subtitle=f"지표: {metric_choice} · 아파트별 월평균",
+            y_min=val_min,
+            y_max=val_max,
         )
-        st_pyecharts(race, height="500px")
         return
 
     line = Line()
