@@ -4,6 +4,9 @@ from PublicDataReader import TransactionPrice, code_bdong
 import datetime
 import re
 import math
+import os
+import json
+import hashlib
 try:
     from pyecharts import options as opts
     from pyecharts.charts import Line, Bar
@@ -174,6 +177,103 @@ if "filter_areas" not in st.session_state: st.session_state.filter_areas = []
 if "filter_floors" not in st.session_state: st.session_state.filter_floors = []
 if "filter_area_unit" not in st.session_state: st.session_state.filter_area_unit = "공급면적(평형대)"
 if "filter_supply_bands" not in st.session_state: st.session_state.filter_supply_bands = []
+
+USER_PREFS_PATH = os.path.join(os.path.dirname(__file__), ".user_prefs.json")
+
+def get_user_pref_key():
+    """헤더/쿠키 기반 사용자 식별 키 생성"""
+    raw = "anonymous"
+    try:
+        ctx = st.context
+        headers = getattr(ctx, "headers", {}) or {}
+        cookies = getattr(ctx, "cookies", {}) or {}
+
+        cookie_seed = ""
+        for k in ("_streamlit_user", "_streamlit_session", "ajs_anonymous_id"):
+            v = cookies.get(k)
+            if v:
+                cookie_seed = str(v)
+                break
+
+        header_seed = "|".join([
+            str(headers.get("x-forwarded-for", "")),
+            str(headers.get("user-agent", "")),
+            str(headers.get("accept-language", "")),
+        ])
+        raw = cookie_seed if cookie_seed else header_seed
+        if not str(raw).strip():
+            raw = "anonymous"
+    except Exception:
+        raw = "anonymous"
+
+    return hashlib.sha256(str(raw).encode("utf-8")).hexdigest()[:24]
+
+def load_user_preferences(user_key):
+    """사용자별 입력값 복원"""
+    if not os.path.exists(USER_PREFS_PATH):
+        return {}
+    try:
+        with open(USER_PREFS_PATH, "r", encoding="utf-8") as f:
+            all_prefs = json.load(f)
+        if isinstance(all_prefs, dict):
+            value = all_prefs.get(user_key, {})
+            return value if isinstance(value, dict) else {}
+    except Exception:
+        pass
+    return {}
+
+def save_user_preferences(user_key, prefs):
+    """사용자별 입력값 저장"""
+    try:
+        all_prefs = {}
+        if os.path.exists(USER_PREFS_PATH):
+            with open(USER_PREFS_PATH, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    all_prefs = loaded
+        all_prefs[user_key] = prefs
+
+        temp_path = f"{USER_PREFS_PATH}.tmp"
+        with open(temp_path, "w", encoding="utf-8") as f:
+            json.dump(all_prefs, f, ensure_ascii=False, indent=2)
+        os.replace(temp_path, USER_PREFS_PATH)
+    except Exception:
+        pass
+
+def parse_date_or_fallback(value, fallback):
+    try:
+        if isinstance(value, datetime.date):
+            return value
+        if isinstance(value, str) and value:
+            return datetime.date.fromisoformat(value)
+    except Exception:
+        pass
+    return fallback
+
+# 사용자별 입력값 초기 복원
+today_for_init = datetime.date.today()
+try:
+    default_start_for_init = today_for_init.replace(year=today_for_init.year - 1)
+except ValueError:
+    default_start_for_init = today_for_init.replace(year=today_for_init.year - 1, day=28)
+
+if "user_pref_key" not in st.session_state:
+    st.session_state.user_pref_key = get_user_pref_key()
+
+if "inputs_restored" not in st.session_state:
+    restored = load_user_preferences(st.session_state.user_pref_key)
+    st.session_state.trade_type_val = restored.get("trade_type", st.session_state.trade_type_val)
+    st.session_state.region_input_text = restored.get("region_input", "송파구")
+    st.session_state.start_date_input = parse_date_or_fallback(
+        restored.get("start_date"),
+        default_start_for_init
+    )
+    st.session_state.end_date_input = parse_date_or_fallback(
+        restored.get("end_date"),
+        today_for_init
+    )
+    st.session_state.apt_keyword_input = restored.get("apt_keyword", "")
+    st.session_state.inputs_restored = True
 
 @st.cache_resource
 def load_bdong_data():
@@ -749,6 +849,17 @@ with st.sidebar:
 
 # --- 조회 로직 ---
 if run_query:
+    save_user_preferences(
+        st.session_state.user_pref_key,
+        {
+            "trade_type": trade_type,
+            "region_input": str(region_input).strip(),
+            "start_date": start_date.isoformat() if isinstance(start_date, datetime.date) else "",
+            "end_date": end_date.isoformat() if isinstance(end_date, datetime.date) else "",
+            "apt_keyword": str(apt_keyword).strip(),
+        }
+    )
+
     if not current_key:
         st.error("❗ 서비스키가 설정되지 않았습니다. Secrets 설정 혹은 수동 입력을 확인하세요.")
     else:
