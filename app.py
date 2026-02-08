@@ -10,6 +10,7 @@ import hashlib
 try:
     from pyecharts import options as opts
     from pyecharts.charts import Line, Bar, Polar
+    from pyecharts.commons.utils import JsCode
     from streamlit_echarts import st_pyecharts
     HAS_PYECHARTS = True
 except ModuleNotFoundError:
@@ -17,6 +18,7 @@ except ModuleNotFoundError:
     Line = None
     Bar = None
     Polar = None
+    JsCode = None
     st_pyecharts = None
     HAS_PYECHARTS = False
 
@@ -892,7 +894,10 @@ def render_rental_polar_scatter(df):
             title="보증금-월세 Polar Scatter",
             subtitle="각 점은 한 건의 전월세 거래를 의미합니다.",
         ),
-        tooltip_opts=opts.TooltipOpts(trigger="item"),
+        tooltip_opts=opts.TooltipOpts(
+            trigger="item",
+            formatter=JsCode("function (params) { var v = params.value || []; return v[0] + ' / ' + v[1]; }"),
+        ),
         legend_opts=opts.LegendOpts(pos_top="4%"),
     )
     st_pyecharts(chart, height="520px")
