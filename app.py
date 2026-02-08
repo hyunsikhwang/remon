@@ -716,6 +716,8 @@ def render_trade_type_chart(df, trade_type):
             metric_options.append(("보증금", "보증금_num", "보증금(만원)"))
         if '월세_num' in base.columns:
             metric_options.append(("월세", "월세_num", "월세(만원)"))
+        if {'보증금_num', '월세_num'}.issubset(base.columns):
+            metric_options.append(("보증금+월세", "combined", "금액(만원)"))
         if not metric_options:
             st.info("전월세 차트를 위한 보증금/월세 데이터가 부족합니다.")
             return
@@ -751,32 +753,71 @@ def render_trade_type_chart(df, trade_type):
     cnt_month = monthly_cnt['거래건수'].tolist()
     cnt_min, cnt_max = axis_bounds(cnt_month, 0.2, force_int=True)
 
-    apt_monthly = (
-        base.groupby(['period', '_apt'], as_index=False)
-        .agg(value=(value_col, 'mean'))
-    )
-    pivot = apt_monthly.pivot(index='period', columns='_apt', values='value').reindex(x_data)
-
     all_values = []
-    for apt in pivot.columns.tolist():
-        vals = pivot[apt].round(1).tolist()
-        all_values.extend([v for v in vals if pd.notna(v)])
-    val_min, val_max = axis_bounds(all_values, 0.12)
-
     line = Line()
     line.add_xaxis(x_data)
-    for apt in pivot.columns.tolist():
-        values = pivot[apt].round(1).tolist()
-        line_values = [None if pd.isna(v) else float(v) for v in values]
-        line.add_yaxis(
-            f"{apt}",
-            line_values,
-            is_smooth=True,
-            symbol="none",
-            is_connect_nones=True,
-            label_opts=opts.LabelOpts(is_show=False),
-            linestyle_opts=opts.LineStyleOpts(width=2.4, type_="solid"),
+    if trade_type == "전월세" and metric_choice == "보증금+월세":
+        dep_monthly = (
+            base.groupby(['period', '_apt'], as_index=False)
+            .agg(value=('보증금_num', 'mean'))
         )
+        dep_pivot = dep_monthly.pivot(index='period', columns='_apt', values='value').reindex(x_data)
+
+        rent_monthly = (
+            base.groupby(['period', '_apt'], as_index=False)
+            .agg(value=('월세_num', 'mean'))
+        )
+        rent_pivot = rent_monthly.pivot(index='period', columns='_apt', values='value').reindex(x_data)
+
+        for apt in dep_pivot.columns.tolist():
+            dep_values = dep_pivot[apt].round(1).tolist()
+            all_values.extend([v for v in dep_values if pd.notna(v)])
+            dep_line_values = [None if pd.isna(v) else float(v) for v in dep_values]
+            line.add_yaxis(
+                f"{apt} 보증금",
+                dep_line_values,
+                is_smooth=True,
+                symbol="none",
+                is_connect_nones=True,
+                label_opts=opts.LabelOpts(is_show=False),
+                linestyle_opts=opts.LineStyleOpts(width=2.4, type_="solid"),
+            )
+
+        for apt in rent_pivot.columns.tolist():
+            rent_values = rent_pivot[apt].round(1).tolist()
+            all_values.extend([v for v in rent_values if pd.notna(v)])
+            rent_line_values = [None if pd.isna(v) else float(v) for v in rent_values]
+            line.add_yaxis(
+                f"{apt} 월세",
+                rent_line_values,
+                is_smooth=True,
+                symbol="none",
+                is_connect_nones=True,
+                label_opts=opts.LabelOpts(is_show=False),
+                linestyle_opts=opts.LineStyleOpts(width=2.0, type_="dashed"),
+            )
+    else:
+        apt_monthly = (
+            base.groupby(['period', '_apt'], as_index=False)
+            .agg(value=(value_col, 'mean'))
+        )
+        pivot = apt_monthly.pivot(index='period', columns='_apt', values='value').reindex(x_data)
+
+        for apt in pivot.columns.tolist():
+            values = pivot[apt].round(1).tolist()
+            all_values.extend([v for v in values if pd.notna(v)])
+            line_values = [None if pd.isna(v) else float(v) for v in values]
+            line.add_yaxis(
+                f"{apt}",
+                line_values,
+                is_smooth=True,
+                symbol="none",
+                is_connect_nones=True,
+                label_opts=opts.LabelOpts(is_show=False),
+                linestyle_opts=opts.LineStyleOpts(width=2.4, type_="solid"),
+            )
+
+    val_min, val_max = axis_bounds(all_values, 0.12)
 
     line.extend_axis(
         yaxis=opts.AxisOpts(
