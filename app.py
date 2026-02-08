@@ -1272,21 +1272,6 @@ if st.session_state.df is not None:
     raw_df = st.session_state.df.copy()
     current_type = st.session_state.trade_type_val
 
-    st.markdown(
-        """
-        <div class="app-topbar">
-            <div></div>
-            <div class="topbar-actions">
-                <span>Share</span>
-                <span class="material-icons-outlined">star_outline</span>
-                <span class="material-icons-outlined">edit_note</span>
-                <span class="material-icons-outlined">account_circle</span>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
     # Hero Section
     st.markdown(f"""
     <div class="hero-container">
