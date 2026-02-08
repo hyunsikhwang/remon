@@ -710,12 +710,6 @@ def render_trade_type_chart(df, trade_type):
                 opts.DataZoomOpts(type_="inside", range_start=0, range_end=100),
                 opts.DataZoomOpts(type_="slider", range_start=0, range_end=100)
             ],
-            animation_opts=opts.AnimationOpts(
-                animation_duration=1200,
-                animation_duration_update=1200,
-                animation_easing="linear",
-                animation_easing_update="linear",
-            ),
         )
         st_pyecharts(race, height="500px")
         return
