@@ -857,7 +857,8 @@ def render_rental_polar_scatter(df):
 
     deposits = scatter_df["보증금_num"].astype(float)
     rents = scatter_df["월세_num"].astype(float)
-    points = list(zip(rents.round(1).tolist(), deposits.round(1).tolist()))
+    # Polar 좌표는 [radius, angle] 순서이므로 [보증금, 월세]로 전달
+    points = list(zip(deposits.round(1).tolist(), rents.round(1).tolist()))
 
     dep_min, dep_max = float(deposits.min()), float(deposits.max())
     rent_min, rent_max = float(rents.min()), float(rents.max())
