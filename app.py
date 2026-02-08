@@ -624,7 +624,7 @@ def render_line_race_timeline(x_data, pivot, y_axis_name, title, subtitle, y_min
                 "axisType": "category",
                 "autoPlay": True,
                 "loop": True,
-                "playInterval": 2200,
+                "playInterval": 500,
                 "data": x_data,
                 "label": {"formatter": "{value}"},
             },
