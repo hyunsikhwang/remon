@@ -667,12 +667,63 @@ def render_trade_type_chart(df, trade_type):
     )
     pivot = apt_monthly.pivot(index='period', columns='_apt', values='value').reindex(x_data)
 
+    chart_mode = st.radio(
+        "차트 모드",
+        options=["기본", "Line Race"],
+        horizontal=True,
+        key=f"chart_mode_{trade_type}"
+    )
+
     all_values = []
+    for apt in pivot.columns.tolist():
+        vals = pivot[apt].round(1).tolist()
+        all_values.extend([v for v in vals if pd.notna(v)])
+    val_min, val_max = axis_bounds(all_values, 0.12)
+
+    if chart_mode == "Line Race":
+        race = Line()
+        race.add_xaxis(x_data)
+        for apt in pivot.columns.tolist():
+            values = pivot[apt].round(1).tolist()
+            line_values = [None if pd.isna(v) else float(v) for v in values]
+            race.add_yaxis(
+                f"{apt}",
+                line_values,
+                is_smooth=True,
+                symbol="none",
+                is_connect_nones=True,
+                label_opts=opts.LabelOpts(is_show=False),
+                linestyle_opts=opts.LineStyleOpts(width=2.8),
+                is_symbol_show=False,
+            )
+
+        race.set_global_opts(
+            title_opts=opts.TitleOpts(
+                title=f"Line Race ({'전월세' if trade_type == '전월세' else '매매'})",
+                subtitle=f"지표: {metric_choice} · 아파트별 월평균"
+            ),
+            tooltip_opts=opts.TooltipOpts(trigger="axis"),
+            legend_opts=opts.LegendOpts(pos_top="4%", type_="scroll"),
+            xaxis_opts=opts.AxisOpts(type_="category", boundary_gap=False),
+            yaxis_opts=opts.AxisOpts(name=y_axis_name, type_="value", min_=val_min, max_=val_max),
+            datazoom_opts=[
+                opts.DataZoomOpts(type_="inside", range_start=0, range_end=100),
+                opts.DataZoomOpts(type_="slider", range_start=0, range_end=100)
+            ],
+            animation_opts=opts.AnimationOpts(
+                animation_duration=1200,
+                animation_duration_update=1200,
+                animation_easing="linear",
+                animation_easing_update="linear",
+            ),
+        )
+        st_pyecharts(race, height="500px")
+        return
+
     line = Line()
     line.add_xaxis(x_data)
     for apt in pivot.columns.tolist():
         values = pivot[apt].round(1).tolist()
-        all_values.extend([v for v in values if pd.notna(v)])
         line_values = [None if pd.isna(v) else float(v) for v in values]
         line.add_yaxis(
             f"{apt}",
@@ -683,8 +734,6 @@ def render_trade_type_chart(df, trade_type):
             label_opts=opts.LabelOpts(is_show=False),
             linestyle_opts=opts.LineStyleOpts(width=2.4, type_="solid"),
         )
-
-    val_min, val_max = axis_bounds(all_values, 0.12)
 
     line.extend_axis(
         yaxis=opts.AxisOpts(
