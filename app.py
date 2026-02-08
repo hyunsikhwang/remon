@@ -503,6 +503,40 @@ def apply_all_column_filters(df, key_prefix):
                     continue
 
                 is_int_like = (numeric_series.dropna() % 1 == 0).all()
+                # 층 컬럼은 슬라이더 대신 체크박스 선택 UI 제공
+                if "층" in str(col) and is_int_like:
+                    floor_values = sorted(numeric_series.dropna().astype(int).unique().tolist())
+                    if not floor_values:
+                        continue
+
+                    for floor in floor_values:
+                        floor_key = f"{key_prefix}_{safe_col}_chk_{floor}"
+                        if floor_key not in st.session_state:
+                            st.session_state[floor_key] = True
+
+                    btn_col1, btn_col2 = st.columns(2)
+                    select_all = btn_col1.button("전체 선택", key=f"{key_prefix}_{safe_col}_chk_all", use_container_width=True)
+                    clear_all = btn_col2.button("전체 해제", key=f"{key_prefix}_{safe_col}_chk_clear", use_container_width=True)
+                    if select_all:
+                        for floor in floor_values:
+                            st.session_state[f"{key_prefix}_{safe_col}_chk_{floor}"] = True
+                    elif clear_all:
+                        for floor in floor_values:
+                            st.session_state[f"{key_prefix}_{safe_col}_chk_{floor}"] = False
+
+                    selected_vals = []
+                    floor_cols = st.columns(4)
+                    for idx, floor in enumerate(floor_values):
+                        with floor_cols[idx % 4]:
+                            checked = st.checkbox(f"{floor}", key=f"{key_prefix}_{safe_col}_chk_{floor}")
+                        if checked:
+                            selected_vals.append(floor)
+
+                    if len(selected_vals) != len(floor_values):
+                        active_count += 1
+                    mask &= numeric_series.astype("Int64").isin(selected_vals)
+                    continue
+
                 if is_int_like:
                     slider_min = int(min_v)
                     slider_max = int(max_v)
