@@ -26,9 +26,20 @@ except ModuleNotFoundError:
 try:
     from awesome_table import AwesomeTable
     HAS_AWESOME_TABLE = True
-except ModuleNotFoundError:
-    AwesomeTable = None
-    HAS_AWESOME_TABLE = False
+except ImportError:
+    # streamlit-awesome-table가 pandas<1.x 경로를 참조하는 문제 호환 처리
+    try:
+        from pandas import json_normalize as _json_normalize
+        import pandas.io.json as _pandas_io_json
+
+        if not hasattr(_pandas_io_json, "json_normalize"):
+            _pandas_io_json.json_normalize = _json_normalize
+
+        from awesome_table import AwesomeTable
+        HAS_AWESOME_TABLE = True
+    except Exception:
+        AwesomeTable = None
+        HAS_AWESOME_TABLE = False
 
 # --- 페이지 설정 ---
 st.set_page_config(
