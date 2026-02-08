@@ -9,13 +9,14 @@ import json
 import hashlib
 try:
     from pyecharts import options as opts
-    from pyecharts.charts import Line, Bar
+    from pyecharts.charts import Line, Bar, Polar
     from streamlit_echarts import st_pyecharts
     HAS_PYECHARTS = True
 except ModuleNotFoundError:
     opts = None
     Line = None
     Bar = None
+    Polar = None
     st_pyecharts = None
     HAS_PYECHARTS = False
 
@@ -834,6 +835,67 @@ def render_trade_type_chart(df, trade_type):
     )
     st_pyecharts(line, height="500px")
 
+def render_rental_polar_scatter(df):
+    """전월세 데이터의 보증금-월세 분포를 Polar Scatter로 렌더링"""
+    if not HAS_PYECHARTS:
+        return
+    if df is None or df.empty:
+        st.info("Polar Scatter를 표시할 데이터가 없습니다.")
+        return
+    if "보증금_num" not in df.columns or "월세_num" not in df.columns:
+        st.info("Polar Scatter를 위한 보증금/월세 데이터가 부족합니다.")
+        return
+
+    scatter_df = df[["보증금_num", "월세_num"]].dropna().copy()
+    scatter_df = scatter_df[
+        (pd.to_numeric(scatter_df["보증금_num"], errors="coerce").notna()) &
+        (pd.to_numeric(scatter_df["월세_num"], errors="coerce").notna())
+    ]
+    if scatter_df.empty:
+        st.info("Polar Scatter를 표시할 유효한 전월세 데이터가 없습니다.")
+        return
+
+    deposits = scatter_df["보증금_num"].astype(float)
+    rents = scatter_df["월세_num"].astype(float)
+    points = list(zip(rents.round(1).tolist(), deposits.round(1).tolist()))
+
+    dep_min, dep_max = float(deposits.min()), float(deposits.max())
+    rent_min, rent_max = float(rents.min()), float(rents.max())
+    dep_pad = max((dep_max - dep_min) * 0.08, 1.0)
+    rent_pad = max((rent_max - rent_min) * 0.08, 1.0)
+
+    chart = Polar()
+    chart.add_schema(
+        angleaxis_opts=opts.AngleAxisOpts(
+            type_="value",
+            min_=max(0, rent_min - rent_pad),
+            max_=rent_max + rent_pad,
+            start_angle=90,
+        ),
+        radiusaxis_opts=opts.RadiusAxisOpts(
+            type_="value",
+            min_=max(0, dep_min - dep_pad),
+            max_=dep_max + dep_pad,
+        ),
+    )
+    chart.add(
+        series_name="전월세 분포",
+        data=points,
+        type_="scatter",
+        symbol_size=8,
+        label_opts=opts.LabelOpts(is_show=False),
+        itemstyle_opts=opts.ItemStyleOpts(color="#0f766e", opacity=0.72),
+    )
+    chart.set_global_opts(
+        title_opts=opts.TitleOpts(
+            title="보증금-월세 Polar Scatter",
+            subtitle="각 점은 한 건의 전월세 거래를 의미합니다.",
+        ),
+        tooltip_opts=opts.TooltipOpts(trigger="item"),
+        legend_opts=opts.LegendOpts(pos_top="4%"),
+    )
+    st_pyecharts(chart, height="520px")
+
 # --- 사이드바 ---
 with st.sidebar:
     st.markdown('<div style="font-size: 1.4rem; font-weight: 800; margin-bottom: 0.25rem;">Search Portal</div>', unsafe_allow_html=True)
@@ -1144,6 +1206,9 @@ if st.session_state.df is not None:
 
         st.subheader("📈 기간별 거래 추이")
         render_trade_type_chart(metric_df, current_type)
+        if current_type == "전월세":
+            st.subheader("🌀 보증금-월세 Polar Scatter")
+            render_rental_polar_scatter(metric_df)
         st.divider()
         
         # 최종 리스트 출력
