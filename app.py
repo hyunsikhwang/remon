@@ -54,24 +54,26 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- 커스텀 CSS (Shadcn Inspired Dashboard Theme) ---
+# --- 커스텀 CSS (Tailwind-inspired dashboard theme) ---
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+    @import url('https://fonts.googleapis.com/icon?family=Material+Icons+Outlined');
     :root {
-        --bg: #f4f6f8;
+        --bg: #f8fafc;
         --panel: #ffffff;
         --ink: #0f172a;
         --muted: #64748b;
         --line: #e2e8f0;
-        --brand: #0f766e;
-        --brand-soft: #ccfbf1;
+        --brand: #0ea5e9;
+        --brand-deep: #0284c7;
+        --good: #10b981;
     }
 
     .block-container {
         padding-top: 1.1rem !important;
         padding-bottom: 2rem !important;
-        max-width: 1220px !important;
+        max-width: 1360px !important;
     }
 
     [data-testid="stHeader"] {
@@ -82,76 +84,252 @@ st.markdown("""
     }
 
     .stApp {
-        background:
-            radial-gradient(1300px 500px at 96% -10%, #d9f99d 0%, transparent 48%),
-            radial-gradient(900px 420px at -5% -20%, #bfdbfe 0%, transparent 46%),
-            var(--bg);
+        background: var(--bg);
         color: var(--ink);
-        font-family: 'Manrope', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
-
-    .hero-container {
-        border: 1px solid var(--line);
-        border-radius: 18px;
-        background: linear-gradient(125deg, rgba(255,255,255,0.9) 0%, rgba(240,253,250,0.9) 100%);
-        box-shadow: 0 10px 30px rgba(2, 8, 23, 0.06);
-        padding: 1.65rem;
-        margin-bottom: 1.25rem;
-    }
-    .hero-title {
-        font-size: 2rem;
-        font-weight: 800;
-        letter-spacing: -0.03em;
-        margin-bottom: 0.3rem;
-    }
-    .hero-subtitle {
-        color: var(--muted);
-        font-size: 0.95rem;
-    }
-
-    [data-testid="stMetric"] {
-        background-color: var(--panel);
-        border: 1px solid var(--line);
-        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
-        border-radius: 14px;
-        padding: 1rem 1.1rem;
-    }
-
-    .stButton > button, button[kind="primary"] {
-        width: 100%;
-        border-radius: 11px;
-        font-weight: 700;
-        background-color: var(--brand);
-        color: white;
-        border: 1px solid var(--brand);
-        padding: 0.56rem 1rem;
-    }
-    .stButton > button:hover, button[kind="primary"]:hover {
-        background-color: #115e59;
-        border-color: #115e59;
+        font-family: 'Inter', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        background: #ffffff;
         border-right: 1px solid var(--line);
     }
 
+    [data-testid="stSidebar"] .block-container {
+        padding-top: 1.35rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+
+    .sidebar-brand {
+        font-size: 1.42rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        color: #0f172a;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 0.1rem;
+    }
+
+    .sidebar-sub {
+        font-size: 0.82rem;
+        color: #64748b;
+        margin-bottom: 1rem;
+    }
+
+    .sidebar-api-ok {
+        background: #f0f9ff;
+        border: 1px solid #dbeafe;
+        color: #0c4a6e;
+        padding: 0.75rem 0.8rem;
+        border-radius: 0.85rem;
+        font-size: 0.83rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        margin-bottom: 0.8rem;
+    }
+
+    .stButton > button, button[kind="primary"], [data-testid="stSidebar"] .stButton > button {
+        width: 100%;
+        border-radius: 0.85rem;
+        font-weight: 700;
+        background: #0f172a;
+        color: white;
+        border: 1px solid #0f172a;
+        padding: 0.68rem 1rem;
+        box-shadow: 0 10px 20px rgba(15, 23, 42, 0.12);
+    }
+    .stButton > button:hover, button[kind="primary"]:hover {
+        background: #1e293b;
+        border-color: #1e293b;
+    }
+
     [data-testid="stVerticalBlockBorderWrapper"] {
-        border: 1px solid var(--line) !important;
-        border-radius: 16px !important;
-        background: rgba(255,255,255,0.9) !important;
-        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.03) !important;
+        border: 1px solid #f1f5f9 !important;
+        border-radius: 1rem !important;
+        background: #ffffff !important;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
         padding: 1rem !important;
-        margin-bottom: 1.2rem !important;
+        margin-bottom: 1rem !important;
     }
 
     [data-testid="stExpander"] {
         border: 1px solid var(--line) !important;
-        border-radius: 12px !important;
+        border-radius: 1rem !important;
         background: #ffffff !important;
     }
+
     [data-testid="stExpander"] summary {
         font-weight: 700;
+    }
+
+    .app-topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.7rem;
+        color: #64748b;
+        font-size: 0.87rem;
+    }
+
+    .topbar-actions {
+        display: flex;
+        gap: 0.95rem;
+        align-items: center;
+    }
+
+    .hero-container {
+        position: relative;
+        border: 1px solid #e2e8f0;
+        border-radius: 1.5rem;
+        background: #ffffff;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        padding: 2.1rem 2.1rem;
+        margin-bottom: 1rem;
+        overflow: hidden;
+    }
+
+    .hero-glow {
+        position: absolute;
+        right: -48px;
+        top: -48px;
+        width: 240px;
+        height: 240px;
+        border-radius: 9999px;
+        background: rgba(14,165,233,0.12);
+        filter: blur(28px);
+    }
+
+    .hero-title {
+        font-size: 2.1rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin-bottom: 0.2rem;
+    }
+
+    .hero-subtitle {
+        color: #64748b;
+        font-size: 1rem;
+    }
+
+    .filter-bar {
+        border: 1px solid #e2e8f0;
+        border-radius: 1rem;
+        background: #ffffff;
+        padding: 0.7rem 0.95rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .filter-chip {
+        border-radius: 0.65rem;
+        background: #f1f5f9;
+        padding: 0.35rem 0.6rem;
+        font-size: 0.77rem;
+        font-weight: 700;
+        color: #334155;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .filter-stat {
+        font-size: 0.78rem;
+        color: #64748b;
+        white-space: nowrap;
+    }
+
+    .kpi-card {
+        background: #ffffff;
+        border: 1px solid #f1f5f9;
+        border-radius: 1rem;
+        padding: 1.05rem 1rem;
+        min-height: 122px;
+        transition: box-shadow 0.18s ease, transform 0.18s ease;
+    }
+
+    .kpi-card:hover {
+        box-shadow: 0 10px 22px rgba(15,23,42,0.08);
+        transform: translateY(-2px);
+    }
+
+    .kpi-title {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #64748b;
+        margin-bottom: 0.72rem;
+    }
+
+    .kpi-val {
+        font-size: 1.95rem;
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: -0.02em;
+        color: #0f172a;
+    }
+
+    .kpi-unit {
+        font-size: 1rem;
+        color: #64748b;
+        font-weight: 700;
+        margin-left: 0.25rem;
+    }
+
+    .kpi-desc {
+        margin-top: 0.62rem;
+        font-size: 0.73rem;
+        color: #94a3b8;
+    }
+
+    .chart-card-title {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-size: 1.45rem;
+        font-weight: 800;
+        color: #0f172a;
+    }
+
+    .chart-sub {
+        color: #64748b;
+        font-size: 0.84rem;
+    }
+
+    [data-testid="stRadio"] label p,
+    [data-testid="stRadio"] span {
+        font-size: 0.86rem !important;
+    }
+
+    [data-testid="stTextInput"] input,
+    [data-testid="stDateInput"] input,
+    [data-testid="stNumberInput"] input,
+    [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
+        border-radius: 0.8rem !important;
+        background: #f8fafc !important;
+        border: 1px solid #e2e8f0 !important;
+    }
+
+    .main-note {
+        color: #94a3b8;
+        font-size: 0.79rem;
+    }
+
+    .material-icons-outlined {
+        font-size: 1.1rem;
+        line-height: 1;
+        vertical-align: middle;
+    }
+
+    [data-testid="stMetric"] {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 1rem !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -625,14 +803,24 @@ def render_awesome_table(df):
     st.dataframe(safe_df, use_container_width=True, hide_index=True)
 
 def render_metric_card(title, content, description, key):
-    """Shadcn metric card 우선 렌더링, 미설치 시 기본 metric 사용"""
-    if HAS_SHADCN_UI:
-        try:
-            ui.metric_card(title=title, content=content, description=description, key=key)
-            return
-        except Exception:
-            pass
-    st.metric(title, content, description)
+    """Dashboard KPI 카드 렌더링"""
+    text = str(content)
+    m = re.match(r'^([0-9,\.\-]+)\s*(.*)$', text)
+    if m:
+        value, unit = m.group(1), m.group(2).strip()
+    else:
+        value, unit = text, ""
+
+    st.markdown(
+        f"""
+        <div class="kpi-card">
+            <div class="kpi-title">{title}</div>
+            <div><span class="kpi-val">{value}</span>{f'<span class="kpi-unit">{unit}</span>' if unit else ''}</div>
+            <div class="kpi-desc">{description}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 def make_period_frame(df):
     """거래일 기준 월 단위 집계 프레임 생성"""
@@ -976,23 +1164,23 @@ def render_rental_polar_scatter(df):
 
 # --- 사이드바 ---
 with st.sidebar:
-    st.markdown('<div style="font-size: 1.4rem; font-weight: 800; margin-bottom: 0.25rem;">Search Portal</div>', unsafe_allow_html=True)
-    st.markdown('<div style="font-size: 0.85rem; color: #64748b; margin-bottom: 1.2rem;">실거래가 데이터 조회</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-brand"><span class="material-icons-outlined" style="color:#0ea5e9;">analytics</span>Search Portal</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-sub">실거래가 데이터 조회 시스템</div>', unsafe_allow_html=True)
     
     if not SECRET_KEY:
-        current_key = st.text_input("🔑 API 인증키", type="password", help="공공데이터포털 API 키")
+        current_key = st.text_input("API 인증키", type="password", help="공공데이터포털 API 키")
     else:
-        st.info("✅ API 키가 설정되어 있습니다.")
+        st.markdown('<div class="sidebar-api-ok"><span class="material-icons-outlined">check_circle</span>API 키가 설정되어 있습니다.</div>', unsafe_allow_html=True)
         current_key = SECRET_KEY
         
     st.divider()
     
-    trade_type = st.radio("🏠 거래 유형", ["매매", "전월세"], 
+    trade_type = st.radio("거래 유형", ["매매", "전월세"], 
                          index=0 if st.session_state.trade_type_val == "매매" else 1, 
                          horizontal=True, key="trade_type_radio")
     st.session_state.trade_type_val = trade_type
     
-    region_input = st.text_input("📍 지역명 (시군구)", value="송파구", key="region_input_text")
+    region_input = st.text_input("지역명 (시군구)", value="송파구", key="region_input_text")
     
     today = datetime.date.today()
     try:
@@ -1002,24 +1190,21 @@ with st.sidebar:
         default_start_date = today.replace(year=today.year - 1, day=28)
     col1, col2 = st.columns(2)
     with col1:
-        start_date = st.date_input("🗓️ 시작월", value=default_start_date, key="start_date_input")
+        start_date = st.date_input("시작월", value=default_start_date, key="start_date_input")
     with col2:
-        end_date = st.date_input("🗓️ 종료월", value=today, key="end_date_input")
+        end_date = st.date_input("종료월", value=today, key="end_date_input")
         
     start_ym = start_date.strftime("%Y%m")
     end_ym = end_date.strftime("%Y%m")
     apt_keyword = st.text_input(
-        "🔍 아파트명 조건식",
+        "아파트명 조건식",
         key="apt_keyword_input",
         help="예시: 래미안&잠실 | 힐스테이트 -리센츠 (AND:& 또는 and, OR:| 또는 or, 제외:-단어/!단어/not 단어)",
         placeholder="예) 래미안&잠실 | 힐스테이트 -리센츠"
     )
     
     st.divider()
-    if HAS_SHADCN_UI:
-        run_query = ui.button(text="데이터 조회 실행", key="run_query_btn")
-    else:
-        run_query = st.button("데이터 조회 실행", type="primary", use_container_width=True)
+    run_query = st.button("데이터 조회 실행", type="primary", use_container_width=True)
 
 # --- 조회 로직 ---
 if run_query:
@@ -1086,10 +1271,26 @@ if run_query:
 if st.session_state.df is not None:
     raw_df = st.session_state.df.copy()
     current_type = st.session_state.trade_type_val
-    
+
+    st.markdown(
+        """
+        <div class="app-topbar">
+            <div></div>
+            <div class="topbar-actions">
+                <span>Share</span>
+                <span class="material-icons-outlined">star_outline</span>
+                <span class="material-icons-outlined">edit_note</span>
+                <span class="material-icons-outlined">account_circle</span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
     # Hero Section
     st.markdown(f"""
     <div class="hero-container">
+        <div class="hero-glow"></div>
         <div class="hero-title">Real Estate Insights</div>
         <div class="hero-subtitle">{st.session_state.region_name} {current_type} 실거래 분석 리포트</div>
     </div>
@@ -1251,7 +1452,18 @@ if st.session_state.df is not None:
         with tab_columns:
             disp_df, col_filter_active_count = apply_all_column_filters(disp_df_base, key_prefix=filter_key_prefix)
 
-    st.caption(f"활성 필터: 빠른 필터 {quick_filter_active_count}개 · 컬럼 필터 {col_filter_active_count}개 · 결과 {len(disp_df):,}건")
+    st.markdown(
+        f"""
+        <div class="filter-bar">
+            <div class="filter-chip">
+                <span class="material-icons-outlined" style="font-size:14px;">dashboard_customize</span>
+                Filter Studio
+            </div>
+            <div class="filter-stat">활성 필터: 빠른 필터 {quick_filter_active_count}개 · 컬럼 필터 {col_filter_active_count}개 · 결과 <b style="color:#0ea5e9;">{len(disp_df):,}건</b></div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
     # 리스트 필터 결과 인덱스를 원본 필터 결과에 매핑해 지표도 동일 기준으로 계산
     metric_df = filtered_df.loc[disp_df.index] if not disp_df.empty else filtered_df.iloc[0:0]
@@ -1282,15 +1494,16 @@ if st.session_state.df is not None:
         
         st.divider()
 
-        st.subheader("📈 기간별 거래 추이")
+        st.markdown('<div class="chart-card-title"><span class="material-icons-outlined" style="color:#ef4444;">trending_up</span>기간별 거래 추이</div>', unsafe_allow_html=True)
+        st.markdown('<div class="chart-sub">전월세/매매 지표와 거래건수를 함께 확인합니다.</div>', unsafe_allow_html=True)
         render_trade_type_chart(metric_df, current_type)
         if current_type == "전월세":
-            st.subheader("🌀 보증금-월세 Polar Scatter")
+            st.markdown('<div class="chart-card-title" style="font-size:1.15rem; margin-top:0.9rem;"><span class="material-icons-outlined" style="color:#0ea5e9;">scatter_plot</span>보증금-월세 Polar Scatter</div>', unsafe_allow_html=True)
             render_rental_polar_scatter(metric_df)
         st.divider()
         
         # 최종 리스트 출력
-        st.subheader("📋 실거래 내역 리스트")
+        st.markdown('<div class="chart-card-title" style="font-size:1.15rem;"><span class="material-icons-outlined" style="color:#0ea5e9;">table_chart</span>실거래 내역 리스트</div>', unsafe_allow_html=True)
         render_awesome_table(disp_df)
         
         # 다운로드 버튼
@@ -1302,8 +1515,9 @@ else:
     # 대기화면 Hero
     st.markdown("""
     <div class="hero-container">
+        <div class="hero-glow"></div>
         <div class="hero-title">Real Estate Insights</div>
         <div class="hero-subtitle">데이터 기반 아파트 실거래가 분석 대시보드</div>
     </div>
     """, unsafe_allow_html=True)
-    st.info("👈 사이드바에서 조회할 지역과 거래 유형을 선택해 주세요.")
+    st.markdown('<div class="main-note">사이드바에서 조회할 지역과 거래 유형을 선택해 주세요.</div>', unsafe_allow_html=True)
