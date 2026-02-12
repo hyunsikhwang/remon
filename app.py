@@ -792,37 +792,63 @@ def render_awesome_table(df):
         st.info("표시할 데이터가 없습니다.")
         return
 
-    st.markdown(
-        """
-        <style>
-            /* Streamlit dataframe (Glide Data Grid) */
-            [data-testid="stDataFrame"] {
-                --gdg-font-size: 8pt !important;
-            }
-            [data-testid="stDataFrame"] div,
-            [data-testid="stDataFrame"] span,
-            [data-testid="stDataFrame"] p {
-                font-size: 8pt !important;
-            }
-
-            /* AwesomeTable and generic HTML table fallback */
-            .awesome-table,
-            .awesome-table *,
-            .awesome-table table,
-            .awesome-table th,
-            .awesome-table td,
-            table,
-            table th,
-            table td {
-                font-size: 8pt !important;
-            }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    table_css = """
+    <style>
+        .modern-deal-table-wrap {
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            background: #ffffff;
+            max-height: 560px;
+            overflow: auto;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        }
+        .modern-deal-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 0.82rem;
+            color: #0f172a;
+            white-space: nowrap;
+        }
+        .modern-deal-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: #f8fafc;
+            color: #334155;
+            font-weight: 700;
+            text-align: left;
+            padding: 0.62rem 0.72rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .modern-deal-table tbody td {
+            padding: 0.55rem 0.72rem;
+            border-bottom: 1px solid #f1f5f9;
+            color: #0f172a;
+        }
+        .modern-deal-table tbody tr:nth-child(even) td {
+            background: #fcfdff;
+        }
+        .modern-deal-table tbody tr:hover td {
+            background: #f0f9ff;
+        }
+    </style>
+    """
 
     safe_df = df.copy().fillna("")
     safe_df.columns = [str(col) for col in safe_df.columns]
+    table_html = safe_df.to_html(
+        index=False,
+        classes="modern-deal-table",
+        border=0,
+        escape=True,
+    )
+    st.markdown(
+        f"{table_css}<div class='modern-deal-table-wrap'>{table_html}</div>",
+        unsafe_allow_html=True,
+    )
+    return
+
     if HAS_AWESOME_TABLE and False:
         try:
             AwesomeTable(safe_df, show_order=True, show_search=True)
