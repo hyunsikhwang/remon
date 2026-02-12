@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 import pandas as pd
 from PublicDataReader import TransactionPrice, code_bdong
 import datetime
@@ -33,7 +33,7 @@ try:
     from awesome_table import AwesomeTable
     HAS_AWESOME_TABLE = True
 except ImportError:
-    # streamlit-awesome-table媛 pandas<1.x 寃쎈줈瑜?李몄“?섎뒗 臾몄젣 ?명솚 泥섎━
+    # streamlit-awesome-table가 pandas<1.x 경로를 참조하는 문제 호환 처리
     try:
         from pandas import json_normalize as _json_normalize
         import pandas.io.json as _pandas_io_json
@@ -47,14 +47,14 @@ except ImportError:
         AwesomeTable = None
         HAS_AWESOME_TABLE = False
 
-# --- ?섏씠吏 ?ㅼ젙 ---
+# --- 페이지 설정 ---
 st.set_page_config(
     page_title="Real Estate Insights",
-    page_icon="?룫",
+    page_icon="🏢",
     layout="wide"
 )
 
-# --- 而ㅼ뒪? CSS (Tailwind-inspired dashboard theme) ---
+# --- 커스텀 CSS (Tailwind-inspired dashboard theme) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
@@ -334,35 +334,35 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- API ???ㅼ젙 (Streamlit Secrets) ---
+# --- API 키 설정 (Streamlit Secrets) ---
 if "service_key" in st.secrets:
     SECRET_KEY = st.secrets["service_key"]
 else:
     SECRET_KEY = None
 
-# --- ?몄뀡 ?곹깭 珥덇린??---
+# --- 세션 상태 초기화 ---
 if "df" not in st.session_state:
     st.session_state.df = None
 if "region_name" not in st.session_state:
     st.session_state.region_name = ""
 if "trade_type_val" not in st.session_state:
-    st.session_state.trade_type_val = "?꾩썡??
+    st.session_state.trade_type_val = "전월세"
 if "df_nonce" not in st.session_state:
     st.session_state.df_nonce = 0
 
-# ?꾪꽣留?議곌굔 ?좎?瑜??꾪븳 ?곹깭 珥덇린??
+# 필터링 조건 유지를 위한 상태 초기화
 if "filter_deal_price" not in st.session_state: st.session_state.filter_deal_price = None
 if "filter_dep_price" not in st.session_state: st.session_state.filter_dep_price = None
 if "filter_rent_price" not in st.session_state: st.session_state.filter_rent_price = None
 if "filter_areas" not in st.session_state: st.session_state.filter_areas = []
 if "filter_floors" not in st.session_state: st.session_state.filter_floors = []
-if "filter_area_unit" not in st.session_state: st.session_state.filter_area_unit = "怨듦툒硫댁쟻(?됲삎?)"
+if "filter_area_unit" not in st.session_state: st.session_state.filter_area_unit = "공급면적(평형대)"
 if "filter_supply_bands" not in st.session_state: st.session_state.filter_supply_bands = []
 
 USER_PREFS_PATH = os.path.join(os.path.dirname(__file__), ".user_prefs.json")
 
 def get_user_pref_key():
-    """?ㅻ뜑/荑좏궎 湲곕컲 ?ъ슜???앸퀎 ???앹꽦"""
+    """헤더/쿠키 기반 사용자 식별 키 생성"""
     raw = "anonymous"
     try:
         ctx = st.context
@@ -390,7 +390,7 @@ def get_user_pref_key():
     return hashlib.sha256(str(raw).encode("utf-8")).hexdigest()[:24]
 
 def load_user_preferences(user_key):
-    """?ъ슜?먮퀎 ?낅젰媛?蹂듭썝"""
+    """사용자별 입력값 복원"""
     if not os.path.exists(USER_PREFS_PATH):
         return {}
     try:
@@ -404,7 +404,7 @@ def load_user_preferences(user_key):
     return {}
 
 def save_user_preferences(user_key, prefs):
-    """?ъ슜?먮퀎 ?낅젰媛????""
+    """사용자별 입력값 저장"""
     try:
         all_prefs = {}
         if os.path.exists(USER_PREFS_PATH):
@@ -431,7 +431,7 @@ def parse_date_or_fallback(value, fallback):
         pass
     return fallback
 
-# ?ъ슜?먮퀎 ?낅젰媛?珥덇린 蹂듭썝
+# 사용자별 입력값 초기 복원
 today_for_init = datetime.date.today()
 try:
     default_start_for_init = today_for_init.replace(year=today_for_init.year - 1)
@@ -444,7 +444,7 @@ if "user_pref_key" not in st.session_state:
 if "inputs_restored" not in st.session_state:
     restored = load_user_preferences(st.session_state.user_pref_key)
     st.session_state.trade_type_val = restored.get("trade_type", st.session_state.trade_type_val)
-    st.session_state.region_input_text = restored.get("region_input", "?≫뙆援?)
+    st.session_state.region_input_text = restored.get("region_input", "송파구")
     st.session_state.start_date_input = parse_date_or_fallback(
         restored.get("start_date"),
         default_start_for_init
@@ -458,46 +458,46 @@ if "inputs_restored" not in st.session_state:
 
 @st.cache_resource
 def load_bdong_data():
-    """踰뺤젙??肄붾뱶 ?곗씠??濡쒕뱶"""
+    """법정동 코드 데이터 로드"""
     try:
         return code_bdong()
     except Exception as e:
-        st.error(f"踰뺤젙???곗씠?곕? 遺덈윭?????놁뒿?덈떎: {e}")
+        st.error(f"법정동 데이터를 불러올 수 없습니다: {e}")
         return pd.DataFrame()
 
 def get_region_code(region_name):
-    """吏??챸???낅젰諛쏆븘 5?먮━ ?쒓뎔援?肄붾뱶瑜?諛섑솚"""
+    """지역명을 입력받아 5자리 시군구 코드를 반환"""
     try:
         df = load_bdong_data()
         if df.empty:
             return None, None
         
-        active_df = df[df['留먯냼?쇱옄'].isna() | (df['留먯냼?쇱옄'] == '')].copy()
-        mask = (active_df['?쒓뎔援щ챸'].str.contains(region_name, na=False)) | \
-               (active_df['?띾㈃?숇챸'].str.contains(region_name, na=False))
+        active_df = df[df['말소일자'].isna() | (df['말소일자'] == '')].copy()
+        mask = (active_df['시군구명'].str.contains(region_name, na=False)) | \
+               (active_df['읍면동명'].str.contains(region_name, na=False))
         
         results = active_df[mask]
         if not results.empty:
             target = results.iloc[0]
-            return str(target['?쒓뎔援ъ퐫??]), f"{target['?쒕룄紐?]} {target['?쒓뎔援щ챸']}"
+            return str(target['시군구코드']), f"{target['시도명']} {target['시군구명']}"
         return None, None
     except Exception as e:
-        st.error(f"吏??肄붾뱶 寃??以??ㅻ쪟: {e}")
+        st.error(f"지역 코드 검색 중 오류: {e}")
         return None, None
 
 def standardize_columns(df):
-    """API 諛섑솚 而щ읆紐낆쓣 ?깆뿉???ъ슜?섎뒗 ?쒖? 紐낆묶?쇰줈 蹂寃?""
+    """API 반환 컬럼명을 앱에서 사용하는 표준 명칭으로 변경"""
     df.columns = [col.strip() for col in df.columns]
     mapping = {
-        '?꾪뙆??: ['?⑥?', '?⑥?紐?, '嫄대Ъ紐?, 'aptNm', '?꾪뙆??],
-        '留ㅻℓ媛': ['嫄곕옒湲덉븸', '嫄곕옒湲덉븸(留뚯썝)', 'dealAmount', '留ㅻℓ媛'],
-        '蹂댁쬆湲?: ['蹂댁쬆湲덉븸', '蹂댁쬆湲?留뚯썝)', 'deposit', '蹂댁쬆湲?],
-        '?붿꽭': ['?붿꽭??, '?붿꽭(留뚯썝)', 'monthlyRent', '?붿꽭'],
-        '?꾩슜硫댁쟻': ['excluUseAr', '?꾩슜硫댁쟻(??', '硫댁쟻', '?꾩슜硫댁쟻'],
-        '痢?: ['floor', '痢듭닔', '痢?],
-        '??: ['dealYear', '??],
-        '??: ['dealMonth', '??],
-        '??: ['dealDay', '??]
+        '아파트': ['단지', '단지명', '건물명', 'aptNm', '아파트'],
+        '매매가': ['거래금액', '거래금액(만원)', 'dealAmount', '매매가'],
+        '보증금': ['보증금액', '보증금(만원)', 'deposit', '보증금'],
+        '월세': ['월세액', '월세(만원)', 'monthlyRent', '월세'],
+        '전용면적': ['excluUseAr', '전용면적(㎡)', '면적', '전용면적'],
+        '층': ['floor', '층수', '층'],
+        '년': ['dealYear', '년'],
+        '월': ['dealMonth', '월'],
+        '일': ['dealDay', '일']
     }
     for standard, candidates in mapping.items():
         for col in candidates:
@@ -507,18 +507,18 @@ def standardize_columns(df):
     return df
 
 def to_numeric_safe(x):
-    """臾몄옄???レ옄瑜??덉쟾?섍쾶 ?レ옄濡?蹂??""
+    """문자열 숫자를 안전하게 숫자로 변환"""
     if pd.isna(x) or x == '': return 0.0
     val = re.sub(r'[^0-9.]', '', str(x))
     return float(val) if val else 0.0
 
 SUPPLY_PYEONG_BANDS = [
-    ((39, 40), "16~18?됲삎"),
-    ((49, 51), "20~22?됲삎"),
-    ((59, 59), "24~26?됲삎"),
-    ((72, 74), "28~30?됲삎"),
-    ((84, 85), "32~35?됲삎"),
-    ((101, 102), "39~41?됲삎"),
+    ((39, 40), "16~18평형"),
+    ((49, 51), "20~22평형"),
+    ((59, 59), "24~26평형"),
+    ((72, 74), "28~30평형"),
+    ((84, 85), "32~35평형"),
+    ((101, 102), "39~41평형"),
 ]
 
 SUPPLY_PYEONG_ANCHORS = [
@@ -531,16 +531,16 @@ SUPPLY_PYEONG_ANCHORS = [
 ]
 
 SUPPLY_BAND_CENTERS = {
-    "16~18?됲삎": 17.0,
-    "20~22?됲삎": 21.0,
-    "24~26?됲삎": 25.0,
-    "28~30?됲삎": 29.0,
-    "32~35?됲삎": 33.5,
-    "39~41?됲삎": 40.0,
+    "16~18평형": 17.0,
+    "20~22평형": 21.0,
+    "24~26평형": 25.0,
+    "28~30평형": 29.0,
+    "32~35평형": 33.5,
+    "39~41평형": 40.0,
 }
 
 def estimate_supply_pyeong(area_m2):
-    """湲곗? ?듭빱瑜??댁슜???꾩슜硫댁쟻(????怨듦툒?됱닔(??濡??좏삎 蹂닿컙/?몄궫"""
+    """기준 앵커를 이용해 전용면적(㎡)을 공급평수(평)로 선형 보간/외삽"""
     if pd.isna(area_m2):
         return None
 
@@ -567,15 +567,15 @@ def estimate_supply_pyeong(area_m2):
     return y0 + (x - x0) * (y1 - y0) / (x1 - x0)
 
 def to_supply_pyeong_band(area_m2):
-    """蹂닿컙??怨듦툒?됱닔瑜?媛??媛源뚯슫 ?됲삎? ?쇰꺼濡?留ㅽ븨"""
+    """보간된 공급평수를 가장 가까운 평형대 라벨로 매핑"""
     est = estimate_supply_pyeong(area_m2)
     if est is None:
         return None
     return min(SUPPLY_BAND_CENTERS.keys(), key=lambda k: abs(SUPPLY_BAND_CENTERS[k] - est))
 
 def apply_apt_keyword_filter(df, expr):
-    """?꾪뙆???ㅼ썙??議곌굔??AND/OR/NOT)???곸슜"""
-    if df is None or df.empty or '?꾪뙆?? not in df.columns:
+    """아파트 키워드 조건식(AND/OR/NOT)을 적용"""
+    if df is None or df.empty or '아파트' not in df.columns:
         return df
     if not expr or not str(expr).strip():
         return df
@@ -587,7 +587,7 @@ def apply_apt_keyword_filter(df, expr):
     if not groups:
         return df
 
-    name_series = df['?꾪뙆??].astype(str)
+    name_series = df['아파트'].astype(str)
     final_mask = pd.Series(False, index=df.index)
 
     for g in groups:
@@ -619,12 +619,12 @@ def apply_apt_keyword_filter(df, expr):
     return df[final_mask]
 
 def apply_all_column_filters(df, key_prefix):
-    """異쒕젰???곗씠?고봽?덉엫??紐⑤뱺 而щ읆??????숈쟻 ?꾪꽣 ?곸슜"""
+    """출력용 데이터프레임의 모든 컬럼에 대해 동적 필터 적용"""
     if df is None or df.empty:
         return df, 0
 
     selected_cols = st.multiselect(
-        "?꾪꽣 而щ읆",
+        "필터 컬럼",
         options=list(df.columns),
         default=[],
         key=f"{key_prefix}_selected_cols"
@@ -636,32 +636,32 @@ def apply_all_column_filters(df, key_prefix):
     mask = pd.Series(True, index=df.index)
     active_count = 0
     for col in selected_cols:
-        with st.expander(f"議곌굔 ?ㅼ젙: {col}", expanded=False):
+        with st.expander(f"조건 설정: {col}", expanded=False):
             series = df[col]
-            safe_col = re.sub(r'[^0-9a-zA-Z_媛-??', '_', str(col))
+            safe_col = re.sub(r'[^0-9a-zA-Z_가-힣]', '_', str(col))
 
             numeric_series = pd.to_numeric(series, errors='coerce')
             numeric_ratio = numeric_series.notna().mean() if len(series) else 0
 
-            # ?꾩슜硫댁쟻? 怨듦툒?됱닔 蹂?섏쓣 吏?먰븯怨?硫?곗꽑??UI ?ъ슜
-            if '?꾩슜硫댁쟻' in str(col) and numeric_ratio >= 0.9 and numeric_series.notna().any():
+            # 전용면적은 공급평수 변환을 지원하고 멀티선택 UI 사용
+            if '전용면적' in str(col) and numeric_ratio >= 0.9 and numeric_series.notna().any():
                 unit = st.radio(
-                    "?쒖떆 ?⑥쐞",
-                    options=["怨듦툒硫댁쟻(?됲삎?)", "?꾩슜硫댁쟻(??"],
+                    "표시 단위",
+                    options=["공급면적(평형대)", "전용면적(㎡)"],
                     horizontal=True,
                     key=f"{key_prefix}_{safe_col}_unit"
                 )
 
-                if unit == "怨듦툒硫댁쟻(?됲삎?)":
+                if unit == "공급면적(평형대)":
                     converted = numeric_series.apply(to_supply_pyeong_band)
                     band_order = [label for _, label in SUPPLY_PYEONG_BANDS]
                     existing = [b for b in band_order if b in converted.dropna().unique().tolist()]
                     options = existing
-                    label = "怨듦툒?됲삎? ?좏깮"
+                    label = "공급평형대 선택"
                 else:
                     converted = numeric_series.round(1)
                     options = sorted([v for v in converted.dropna().unique().tolist()])
-                    label = "?꾩슜硫댁쟻(?? ?좏깮"
+                    label = "전용면적(㎡) 선택"
 
                 selected_vals = st.multiselect(
                     label,
@@ -674,18 +674,18 @@ def apply_all_column_filters(df, key_prefix):
                 mask &= converted.isin(selected_vals)
                 continue
 
-            # ?レ옄濡??댁꽍 媛?ν븳 而щ읆? 踰붿쐞 ?꾪꽣 ?쒓났
+            # 숫자로 해석 가능한 컬럼은 범위 필터 제공
             if numeric_ratio >= 0.9 and numeric_series.notna().any():
                 min_v = float(numeric_series.min())
                 max_v = float(numeric_series.max())
 
                 if min_v == max_v:
-                    st.caption(f"?⑥씪 媛?{min_v:g})留?議댁옱?⑸땲??")
+                    st.caption(f"단일 값({min_v:g})만 존재합니다.")
                     continue
 
                 is_int_like = (numeric_series.dropna() % 1 == 0).all()
-                # 痢?而щ읆? ?щ씪?대뜑 ???泥댄겕諛뺤뒪 ?좏깮 UI ?쒓났
-                if "痢? in str(col) and is_int_like:
+                # 층 컬럼은 슬라이더 대신 체크박스 선택 UI 제공
+                if "층" in str(col) and is_int_like:
                     floor_values = sorted(numeric_series.dropna().astype(int).unique().tolist())
                     if not floor_values:
                         continue
@@ -696,8 +696,8 @@ def apply_all_column_filters(df, key_prefix):
                             st.session_state[floor_key] = True
 
                     btn_col1, btn_col2 = st.columns(2)
-                    select_all = btn_col1.button("?꾩껜 ?좏깮", key=f"{key_prefix}_{safe_col}_chk_all", use_container_width=True)
-                    clear_all = btn_col2.button("?꾩껜 ?댁젣", key=f"{key_prefix}_{safe_col}_chk_clear", use_container_width=True)
+                    select_all = btn_col1.button("전체 선택", key=f"{key_prefix}_{safe_col}_chk_all", use_container_width=True)
+                    clear_all = btn_col2.button("전체 해제", key=f"{key_prefix}_{safe_col}_chk_clear", use_container_width=True)
                     if select_all:
                         for floor in floor_values:
                             st.session_state[f"{key_prefix}_{safe_col}_chk_{floor}"] = True
@@ -723,7 +723,7 @@ def apply_all_column_filters(df, key_prefix):
                     slider_max = int(max_v)
                     step = 1 if slider_max - slider_min <= 200 else max(1, (slider_max - slider_min) // 200)
                     selected_range = st.slider(
-                        f"{col} 踰붿쐞",
+                        f"{col} 범위",
                         min_value=slider_min,
                         max_value=slider_max,
                         value=(slider_min, slider_max),
@@ -732,7 +732,7 @@ def apply_all_column_filters(df, key_prefix):
                     )
                 else:
                     selected_range = st.slider(
-                        f"{col} 踰붿쐞",
+                        f"{col} 범위",
                         min_value=min_v,
                         max_value=max_v,
                         value=(min_v, max_v),
@@ -744,13 +744,13 @@ def apply_all_column_filters(df, key_prefix):
                 mask &= numeric_series.between(selected_range[0], selected_range[1], inclusive='both')
                 continue
 
-            # 臾몄옄??而щ읆? 怨좎쑀媛??섏뿉 ?곕씪 ?ㅼ쨷?좏깮/遺遺꾧????쒓났
+            # 문자열 컬럼은 고유값 수에 따라 다중선택/부분검색 제공
             str_series = series.astype(str)
             unique_vals = sorted([v for v in str_series.dropna().unique().tolist() if v != "nan"])
 
             if len(unique_vals) <= 100:
                 selected_vals = st.multiselect(
-                    f"{col} 媛??좏깮",
+                    f"{col} 값 선택",
                     options=unique_vals,
                     default=unique_vals,
                     key=f"{key_prefix}_{safe_col}_values"
@@ -760,10 +760,10 @@ def apply_all_column_filters(df, key_prefix):
                 mask &= str_series.isin(selected_vals)
             else:
                 keyword = st.text_input(
-                    f"{col} 遺遺꾧???,
+                    f"{col} 부분검색",
                     value="",
                     key=f"{key_prefix}_{safe_col}_keyword",
-                    placeholder=f"{col}???ы븿???띿뒪???낅젰"
+                    placeholder=f"{col}에 포함될 텍스트 입력"
                 )
                 if keyword:
                     active_count += 1
@@ -772,22 +772,22 @@ def apply_all_column_filters(df, key_prefix):
     return df[mask], active_count
 
 def reset_filter_state(key_prefix):
-    """湲곕낯 ?꾪꽣/?숈쟻 而щ읆 ?꾪꽣 ?곹깭 珥덇린??""
+    """기본 필터/동적 컬럼 필터 상태 초기화"""
     st.session_state.filter_deal_price = None
     st.session_state.filter_dep_price = None
     st.session_state.filter_rent_price = None
     st.session_state.filter_areas = []
-    st.session_state.filter_area_unit = "怨듦툒硫댁쟻(?됲삎?)"
+    st.session_state.filter_area_unit = "공급면적(평형대)"
     st.session_state.filter_supply_bands = []
     st.session_state.filter_floors = []
-    st.session_state.quick_area_unit = "怨듦툒硫댁쟻(?됲삎?)"
+    st.session_state.quick_area_unit = "공급면적(평형대)"
 
     delete_keys = [k for k in st.session_state.keys() if str(k).startswith(key_prefix)]
     for k in delete_keys:
         del st.session_state[k]
 
 def render_awesome_table(df):
-    """실거래 리스트를 테이블로 렌더링"""
+    """실거래 리스트를 AwesomeTable로 렌더링"""
     if df is None or df.empty:
         st.info("표시할 데이터가 없습니다.")
         return
@@ -795,12 +795,25 @@ def render_awesome_table(df):
     st.markdown(
         """
         <style>
+            /* Streamlit dataframe (Glide Data Grid) */
             [data-testid="stDataFrame"] {
                 --gdg-font-size: 8pt !important;
             }
             [data-testid="stDataFrame"] div,
             [data-testid="stDataFrame"] span,
             [data-testid="stDataFrame"] p {
+                font-size: 8pt !important;
+            }
+
+            /* AwesomeTable and generic HTML table fallback */
+            .awesome-table,
+            .awesome-table *,
+            .awesome-table table,
+            .awesome-table th,
+            .awesome-table td,
+            table,
+            table th,
+            table td {
                 font-size: 8pt !important;
             }
         </style>
@@ -810,9 +823,16 @@ def render_awesome_table(df):
 
     safe_df = df.copy().fillna("")
     safe_df.columns = [str(col) for col in safe_df.columns]
+    if HAS_AWESOME_TABLE and False:
+        try:
+            AwesomeTable(safe_df, show_order=True, show_search=True)
+            return
+        except Exception as e:
+            st.warning(f"AwesomeTable 렌더링에 실패해 기본 테이블로 대체합니다: {e}")
     st.dataframe(safe_df, use_container_width=True, hide_index=True)
+
 def render_metric_card(title, content, description, key):
-    """Dashboard KPI 移대뱶 ?뚮뜑留?""
+    """Dashboard KPI 카드 렌더링"""
     text = str(content)
     m = re.match(r'^([0-9,\.\-]+)\s*(.*)$', text)
     if m:
@@ -832,21 +852,21 @@ def render_metric_card(title, content, description, key):
     )
 
 def make_period_frame(df):
-    """嫄곕옒??湲곗? ???⑥쐞 吏묎퀎 ?꾨젅???앹꽦"""
+    """거래일 기준 월 단위 집계 프레임 생성"""
     if df is None or df.empty:
         return pd.DataFrame()
-    if not all(c in df.columns for c in ['??, '??]):
+    if not all(c in df.columns for c in ['년', '월']):
         return pd.DataFrame()
 
     work = df.copy()
-    if '?? in work.columns:
-        day_vals = pd.to_numeric(work['??], errors='coerce').fillna(1).astype(int)
+    if '일' in work.columns:
+        day_vals = pd.to_numeric(work['일'], errors='coerce').fillna(1).astype(int)
     else:
         day_vals = pd.Series(1, index=work.index)
 
     date_str = (
-        pd.to_numeric(work['??], errors='coerce').fillna(0).astype(int).astype(str).str.zfill(4) + "-" +
-        pd.to_numeric(work['??], errors='coerce').fillna(0).astype(int).astype(str).str.zfill(2) + "-" +
+        pd.to_numeric(work['년'], errors='coerce').fillna(0).astype(int).astype(str).str.zfill(4) + "-" +
+        pd.to_numeric(work['월'], errors='coerce').fillna(0).astype(int).astype(str).str.zfill(2) + "-" +
         day_vals.astype(str).str.zfill(2)
     )
     work['deal_date'] = pd.to_datetime(date_str, errors='coerce')
@@ -858,14 +878,14 @@ def make_period_frame(df):
     return work
 
 def render_trade_type_chart(df, trade_type):
-    """嫄곕옒?좏삎蹂?湲곌컙-媛寃??곴? 李⑦듃 ?뚮뜑留?(pyecharts)"""
+    """거래유형별 기간-가격 상관 차트 렌더링 (pyecharts)"""
     if not HAS_PYECHARTS:
-        st.error("李⑦듃 ?쇱씠釉뚮윭由?pyecharts)媛 ?ㅼ튂?섏? ?딆븯?듬땲?? `pip install -r requirements.txt` ???ㅼ떆 ?ㅽ뻾?댁＜?몄슂.")
+        st.error("차트 라이브러리(pyecharts)가 설치되지 않았습니다. `pip install -r requirements.txt` 후 다시 실행해주세요.")
         return
 
     base = make_period_frame(df)
     if base.empty:
-        st.info("李⑦듃瑜?洹몃┫ 湲곌컙 ?곗씠?곌? 遺議깊빀?덈떎.")
+        st.info("차트를 그릴 기간 데이터가 부족합니다.")
         return
 
     def axis_bounds(values, pad_ratio=0.08, force_int=False):
@@ -888,7 +908,7 @@ def render_trade_type_chart(df, trade_type):
                 high = low + 1
             return low, high
 
-        # 遺?숈냼?섏젏 ?몄씠利??? 7.14800000002) ?쒓굅??異뺢컪 ?뺢퇋??
+        # 부동소수점 노이즈(예: 7.14800000002) 제거용 축값 정규화
         max_abs = max(abs(low), abs(high))
         if max_abs >= 1000:
             digits = 0
@@ -907,65 +927,65 @@ def render_trade_type_chart(df, trade_type):
             high = round(high + (10 ** (-digits)), digits)
         return low, high
 
-    if trade_type == "?꾩썡??:
+    if trade_type == "전월세":
         metric_options = []
-        if '蹂댁쬆湲?num' in base.columns:
-            metric_options.append(("蹂댁쬆湲?, "蹂댁쬆湲?num", "蹂댁쬆湲?留뚯썝)"))
-        if '?붿꽭_num' in base.columns:
-            metric_options.append(("?붿꽭", "?붿꽭_num", "?붿꽭(留뚯썝)"))
-        if {'蹂댁쬆湲?num', '?붿꽭_num'}.issubset(base.columns):
-            metric_options.append(("蹂댁쬆湲??붿꽭", "combined", "湲덉븸(留뚯썝)"))
+        if '보증금_num' in base.columns:
+            metric_options.append(("보증금", "보증금_num", "보증금(만원)"))
+        if '월세_num' in base.columns:
+            metric_options.append(("월세", "월세_num", "월세(만원)"))
+        if {'보증금_num', '월세_num'}.issubset(base.columns):
+            metric_options.append(("보증금+월세", "combined", "금액(만원)"))
         if not metric_options:
-            st.info("?꾩썡??李⑦듃瑜??꾪븳 蹂댁쬆湲??붿꽭 ?곗씠?곌? 遺議깊빀?덈떎.")
+            st.info("전월세 차트를 위한 보증금/월세 데이터가 부족합니다.")
             return
 
         metric_map = {label: (col, y_name) for label, col, y_name in metric_options}
         metric_choice = st.radio(
-            "?꾩썡??李⑦듃 吏??,
+            "전월세 차트 지표",
             options=[m[0] for m in metric_options],
             horizontal=True,
             key="rental_chart_metric"
         )
         value_col, y_axis_name = metric_map[metric_choice]
     else:
-        if '留ㅻℓ媛_num' not in base.columns:
-            st.info("留ㅻℓ 李⑦듃瑜??꾪븳 留ㅻℓ媛 ?곗씠?곌? 遺議깊빀?덈떎.")
+        if '매매가_num' not in base.columns:
+            st.info("매매 차트를 위한 매매가 데이터가 부족합니다.")
             return
-        value_col, y_axis_name = "留ㅻℓ媛_num", "留ㅻℓ媛(留뚯썝)"
-        metric_choice = "留ㅻℓ媛"
+        value_col, y_axis_name = "매매가_num", "매매가(만원)"
+        metric_choice = "매매가"
 
-    apt_series = pd.Series(["?꾩껜"] * len(base), index=base.index)
-    if '?꾪뙆?? in base.columns:
-        apt_series = base['?꾪뙆??].astype(str).replace("nan", "").replace("", "誘몄긽")
+    apt_series = pd.Series(["전체"] * len(base), index=base.index)
+    if '아파트' in base.columns:
+        apt_series = base['아파트'].astype(str).replace("nan", "").replace("", "미상")
     base = base.assign(_apt=apt_series)
     apt_names = [n for n in sorted(base['_apt'].dropna().unique().tolist()) if str(n).strip() != ""]
     multi_apt = len(apt_names) >= 2
 
     monthly_cnt = (
         base.groupby('period', as_index=False)
-        .agg(嫄곕옒嫄댁닔=('period', 'count'))
+        .agg(거래건수=('period', 'count'))
         .sort_values('period')
     )
     x_data = monthly_cnt['period'].tolist()
-    cnt_month = monthly_cnt['嫄곕옒嫄댁닔'].tolist()
+    cnt_month = monthly_cnt['거래건수'].tolist()
     cnt_min, cnt_max = axis_bounds(cnt_month, 0.2, force_int=True)
 
     all_values = []
     dep_values_all = []
     rent_values_all = []
-    combined_dual_axis = trade_type == "?꾩썡?? and metric_choice == "蹂댁쬆湲??붿꽭"
+    combined_dual_axis = trade_type == "전월세" and metric_choice == "보증금+월세"
     line = Line()
     line.add_xaxis(x_data)
     if combined_dual_axis:
         dep_monthly = (
             base.groupby(['period', '_apt'], as_index=False)
-            .agg(value=('蹂댁쬆湲?num', 'mean'))
+            .agg(value=('보증금_num', 'mean'))
         )
         dep_pivot = dep_monthly.pivot(index='period', columns='_apt', values='value').reindex(x_data)
 
         rent_monthly = (
             base.groupby(['period', '_apt'], as_index=False)
-            .agg(value=('?붿꽭_num', 'mean'))
+            .agg(value=('월세_num', 'mean'))
         )
         rent_pivot = rent_monthly.pivot(index='period', columns='_apt', values='value').reindex(x_data)
 
@@ -975,7 +995,7 @@ def render_trade_type_chart(df, trade_type):
             all_values.extend([v for v in dep_values if pd.notna(v)])
             dep_line_values = [None if pd.isna(v) else float(v) for v in dep_values]
             line.add_yaxis(
-                f"{apt} 蹂댁쬆湲?,
+                f"{apt} 보증금",
                 dep_line_values,
                 yaxis_index=0,
                 is_smooth=True,
@@ -991,7 +1011,7 @@ def render_trade_type_chart(df, trade_type):
             all_values.extend([v for v in rent_values if pd.notna(v)])
             rent_line_values = [None if pd.isna(v) else float(v) for v in rent_values]
             line.add_yaxis(
-                f"{apt} ?붿꽭",
+                f"{apt} 월세",
                 rent_line_values,
                 yaxis_index=1,
                 is_smooth=True,
@@ -1029,7 +1049,7 @@ def render_trade_type_chart(df, trade_type):
         dep_min, dep_max = axis_bounds(dep_values_all, 0.12)
         line.extend_axis(
             yaxis=opts.AxisOpts(
-                name="?붿꽭(留뚯썝)",
+                name="월세(만원)",
                 type_="value",
                 position="right",
                 min_=rent_min,
@@ -1043,7 +1063,7 @@ def render_trade_type_chart(df, trade_type):
 
     line.extend_axis(
         yaxis=opts.AxisOpts(
-            name="嫄곕옒嫄댁닔(嫄?",
+            name="거래건수(건)",
             type_="value",
             position="right",
             offset=56 if combined_dual_axis else 0,
@@ -1065,7 +1085,7 @@ def render_trade_type_chart(df, trade_type):
         )
         for apt in cnt_by_apt.columns.tolist():
             bar.add_yaxis(
-                f"{apt} 嫄곕옒嫄댁닔",
+                f"{apt} 거래건수",
                 cnt_by_apt[apt].astype(int).tolist(),
                 yaxis_index=cnt_axis_index,
                 stack="apt_cnt",
@@ -1076,7 +1096,7 @@ def render_trade_type_chart(df, trade_type):
             )
     else:
         bar.add_yaxis(
-            "?붾퀎 嫄곕옒嫄댁닔",
+            "월별 거래건수",
             cnt_month,
             yaxis_index=cnt_axis_index,
             bar_width="60%",
@@ -1086,15 +1106,15 @@ def render_trade_type_chart(df, trade_type):
         )
 
     line.overlap(bar)
-    title = f"?뷀룊洹?異붿꽭 + ?붾퀎 嫄곕옒嫄댁닔 ({'?꾩썡?? if trade_type == '?꾩썡?? else '留ㅻℓ'})"
-    subtitle = f"吏?? {metric_choice} 쨌 {'?꾪뙆?몃퀎 ?쇱씤' if multi_apt else '?⑥씪 ?쇱씤'}"
+    title = f"월평균 추세 + 월별 거래건수 ({'전월세' if trade_type == '전월세' else '매매'})"
+    subtitle = f"지표: {metric_choice} · {'아파트별 라인' if multi_apt else '단일 라인'}"
     line.set_global_opts(
         title_opts=opts.TitleOpts(title=title, subtitle=subtitle),
         tooltip_opts=opts.TooltipOpts(trigger="axis"),
         legend_opts=opts.LegendOpts(pos_top="4%", type_="scroll"),
         xaxis_opts=opts.AxisOpts(type_="category", boundary_gap=False),
         yaxis_opts=opts.AxisOpts(
-            name="蹂댁쬆湲?留뚯썝)" if combined_dual_axis else y_axis_name,
+            name="보증금(만원)" if combined_dual_axis else y_axis_name,
             type_="value",
             min_=dep_min,
             max_=dep_max,
@@ -1107,28 +1127,28 @@ def render_trade_type_chart(df, trade_type):
     st_pyecharts(line, height="500px")
 
 def render_rental_polar_scatter(df):
-    """?꾩썡???곗씠?곗쓽 蹂댁쬆湲??붿꽭 遺꾪룷瑜?Polar Scatter濡??뚮뜑留?""
+    """전월세 데이터의 보증금-월세 분포를 Polar Scatter로 렌더링"""
     if not HAS_PYECHARTS:
         return
     if df is None or df.empty:
-        st.info("Polar Scatter瑜??쒖떆???곗씠?곌? ?놁뒿?덈떎.")
+        st.info("Polar Scatter를 표시할 데이터가 없습니다.")
         return
-    if "蹂댁쬆湲?num" not in df.columns or "?붿꽭_num" not in df.columns:
-        st.info("Polar Scatter瑜??꾪븳 蹂댁쬆湲??붿꽭 ?곗씠?곌? 遺議깊빀?덈떎.")
+    if "보증금_num" not in df.columns or "월세_num" not in df.columns:
+        st.info("Polar Scatter를 위한 보증금/월세 데이터가 부족합니다.")
         return
 
-    scatter_df = df[["蹂댁쬆湲?num", "?붿꽭_num"]].dropna().copy()
+    scatter_df = df[["보증금_num", "월세_num"]].dropna().copy()
     scatter_df = scatter_df[
-        (pd.to_numeric(scatter_df["蹂댁쬆湲?num"], errors="coerce").notna()) &
-        (pd.to_numeric(scatter_df["?붿꽭_num"], errors="coerce").notna())
+        (pd.to_numeric(scatter_df["보증금_num"], errors="coerce").notna()) &
+        (pd.to_numeric(scatter_df["월세_num"], errors="coerce").notna())
     ]
     if scatter_df.empty:
-        st.info("Polar Scatter瑜??쒖떆???좏슚???꾩썡???곗씠?곌? ?놁뒿?덈떎.")
+        st.info("Polar Scatter를 표시할 유효한 전월세 데이터가 없습니다.")
         return
 
-    deposits = scatter_df["蹂댁쬆湲?num"].astype(float)
-    rents = scatter_df["?붿꽭_num"].astype(float)
-    # Polar 醫뚰몴??[radius, angle] ?쒖꽌?대?濡?[蹂댁쬆湲? ?붿꽭]濡??꾨떖
+    deposits = scatter_df["보증금_num"].astype(float)
+    rents = scatter_df["월세_num"].astype(float)
+    # Polar 좌표는 [radius, angle] 순서이므로 [보증금, 월세]로 전달
     points = list(zip(deposits.round(1).tolist(), rents.round(1).tolist()))
 
     dep_min, dep_max = float(deposits.min()), float(deposits.max())
@@ -1151,7 +1171,7 @@ def render_rental_polar_scatter(df):
         ),
     )
     chart.add(
-        series_name="?꾩썡??遺꾪룷",
+        series_name="전월세 분포",
         data=points,
         type_="scatter",
         symbol_size=8,
@@ -1160,8 +1180,8 @@ def render_rental_polar_scatter(df):
     )
     chart.set_global_opts(
         title_opts=opts.TitleOpts(
-            title="蹂댁쬆湲??붿꽭 Polar Scatter",
-            subtitle="媛??먯? ??嫄댁쓽 ?꾩썡??嫄곕옒瑜??섎??⑸땲??",
+            title="보증금-월세 Polar Scatter",
+            subtitle="각 점은 한 건의 전월세 거래를 의미합니다.",
         ),
         tooltip_opts=opts.TooltipOpts(
             trigger="item",
@@ -1171,51 +1191,51 @@ def render_rental_polar_scatter(df):
     )
     st_pyecharts(chart, height="520px")
 
-# --- ?ъ씠?쒕컮 ---
+# --- 사이드바 ---
 with st.sidebar:
     st.markdown('<div class="sidebar-brand"><span class="material-icons-outlined" style="color:#0ea5e9;">analytics</span>Search Portal</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-sub">?ㅺ굅?섍? ?곗씠??議고쉶 ?쒖뒪??/div>', unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-sub">실거래가 데이터 조회 시스템</div>', unsafe_allow_html=True)
     
     if not SECRET_KEY:
-        current_key = st.text_input("API ?몄쬆??, type="password", help="怨듦났?곗씠?고룷??API ??)
+        current_key = st.text_input("API 인증키", type="password", help="공공데이터포털 API 키")
     else:
-        st.markdown('<div class="sidebar-api-ok"><span class="material-icons-outlined">check_circle</span>API ?ㅺ? ?ㅼ젙?섏뼱 ?덉뒿?덈떎.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sidebar-api-ok"><span class="material-icons-outlined">check_circle</span>API 키가 설정되어 있습니다.</div>', unsafe_allow_html=True)
         current_key = SECRET_KEY
         
     st.divider()
     
-    trade_type = st.radio("嫄곕옒 ?좏삎", ["留ㅻℓ", "?꾩썡??], 
-                         index=0 if st.session_state.trade_type_val == "留ㅻℓ" else 1, 
+    trade_type = st.radio("거래 유형", ["매매", "전월세"], 
+                         index=0 if st.session_state.trade_type_val == "매매" else 1, 
                          horizontal=True, key="trade_type_radio")
     st.session_state.trade_type_val = trade_type
     
-    region_input = st.text_input("吏??챸 (?쒓뎔援?", value="?≫뙆援?, key="region_input_text")
+    region_input = st.text_input("지역명 (시군구)", value="송파구", key="region_input_text")
     
     today = datetime.date.today()
     try:
         default_start_date = today.replace(year=today.year - 1)
     except ValueError:
-        # ?ㅻ뀈 2/29??寃쎌슦 1????2/28濡?蹂댁젙
+        # 윤년 2/29인 경우 1년 전 2/28로 보정
         default_start_date = today.replace(year=today.year - 1, day=28)
     col1, col2 = st.columns(2)
     with col1:
-        start_date = st.date_input("?쒖옉??, value=default_start_date, key="start_date_input")
+        start_date = st.date_input("시작월", value=default_start_date, key="start_date_input")
     with col2:
-        end_date = st.date_input("醫낅즺??, value=today, key="end_date_input")
+        end_date = st.date_input("종료월", value=today, key="end_date_input")
         
     start_ym = start_date.strftime("%Y%m")
     end_ym = end_date.strftime("%Y%m")
     apt_keyword = st.text_input(
-        "?꾪뙆?몃챸 議곌굔??,
+        "아파트명 조건식",
         key="apt_keyword_input",
-        help="?덉떆: ?섎????좎떎 | ?먯뒪?뚯씠??-由ъ꽱痢?(AND:& ?먮뒗 and, OR:| ?먮뒗 or, ?쒖쇅:-?⑥뼱/!?⑥뼱/not ?⑥뼱)",
-        placeholder="?? ?섎????좎떎 | ?먯뒪?뚯씠??-由ъ꽱痢?
+        help="예시: 래미안&잠실 | 힐스테이트 -리센츠 (AND:& 또는 and, OR:| 또는 or, 제외:-단어/!단어/not 단어)",
+        placeholder="예) 래미안&잠실 | 힐스테이트 -리센츠"
     )
     
     st.divider()
-    run_query = st.button("?곗씠??議고쉶 ?ㅽ뻾", type="primary", use_container_width=True)
+    run_query = st.button("데이터 조회 실행", type="primary", use_container_width=True)
 
-# --- 議고쉶 濡쒖쭅 ---
+# --- 조회 로직 ---
 if run_query:
     save_user_preferences(
         st.session_state.user_pref_key,
@@ -1229,18 +1249,18 @@ if run_query:
     )
 
     if not current_key:
-        st.error("???쒕퉬?ㅽ궎媛 ?ㅼ젙?섏? ?딆븯?듬땲?? Secrets ?ㅼ젙 ?뱀? ?섎룞 ?낅젰???뺤씤?섏꽭??")
+        st.error("❗ 서비스키가 설정되지 않았습니다. Secrets 설정 혹은 수동 입력을 확인하세요.")
     else:
-        with st.spinner(f"??{trade_type} ?곗씠???섏쭛 以?.."):
+        with st.spinner(f"⚡ {trade_type} 데이터 수집 중..."):
             sigungu_code, full_region_name = get_region_code(region_input)
             
             if not sigungu_code:
-                st.error(f"??'{region_input}' 吏??쓣 李얠쓣 ???놁뒿?덈떎.")
+                st.error(f"❌ '{region_input}' 지역을 찾을 수 없습니다.")
             else:
                 try:
                     api = TransactionPrice(current_key)
                     df = api.get_data(
-                        property_type="?꾪뙆??,
+                        property_type="아파트",
                         trade_type=trade_type,
                         sigungu_code=sigungu_code,
                         start_year_month=start_ym,
@@ -1250,15 +1270,15 @@ if run_query:
                     if df is not None and not df.empty:
                         df = standardize_columns(df)
                         
-                        target_cols = ['留ㅻℓ媛', '蹂댁쬆湲?, '?붿꽭', '?꾩슜硫댁쟻', '痢?]
+                        target_cols = ['매매가', '보증금', '월세', '전용면적', '층']
                         for col in target_cols:
                             if col in df.columns:
                                 df[f'{col}_num'] = df[col].apply(to_numeric_safe)
                         
-                        if apt_keyword and '?꾪뙆?? in df.columns:
+                        if apt_keyword and '아파트' in df.columns:
                             df = apply_apt_keyword_filter(df, apt_keyword)
                         
-                        sort_cols = [c for c in ['??, '??, '??] if c in df.columns]
+                        sort_cols = [c for c in ['년', '월', '일'] if c in df.columns]
                         if sort_cols:
                             df = df.sort_values(by=sort_cols, ascending=False).reset_index(drop=True)
                         
@@ -1267,16 +1287,16 @@ if run_query:
                         st.session_state.region_name = full_region_name
                         st.session_state.trade_type_val = trade_type
                         
-                        # ?덈줈???곗씠?곕? 議고쉶?????꾪꽣 珥덇린?붽? ?꾩슂?섎떎硫??ш린???섑뻾 (?붽뎄?ы빆? ?좎??대?濡??앸왂)
+                        # 새로운 데이터를 조회할 때 필터 초기화가 필요하다면 여기서 수행 (요구사항은 유지이므로 생략)
                     else:
                         st.session_state.df = None
-                        st.warning(f"?좑툘 {full_region_name} ?곗씠?곌? ?놁뒿?덈떎.")
+                        st.warning(f"⚠️ {full_region_name} 데이터가 없습니다.")
                         
                 except Exception as e:
-                    st.error(f"??API ?ㅻ쪟: {e}")
+                    st.error(f"❌ API 오류: {e}")
                     st.session_state.df = None
 
-# --- 硫붿씤 UI ---
+# --- 메인 UI ---
 if st.session_state.df is not None:
     raw_df = st.session_state.df.copy()
     current_type = st.session_state.trade_type_val
@@ -1286,7 +1306,7 @@ if st.session_state.df is not None:
     <div class="hero-container">
         <div class="hero-glow"></div>
         <div class="hero-title">Real Estate Insights</div>
-        <div class="hero-subtitle">{st.session_state.region_name} {current_type} ?ㅺ굅??遺꾩꽍 由ы룷??/div>
+        <div class="hero-subtitle">{st.session_state.region_name} {current_type} 실거래 분석 리포트</div>
     </div>
     """, unsafe_allow_html=True)
     
@@ -1295,29 +1315,29 @@ if st.session_state.df is not None:
     col_filter_active_count = 0
     filter_key_prefix = f"list_filter_{st.session_state.df_nonce}"
 
-    # 媛怨듭슜 而щ읆 ?쒓굅 ??由ъ뒪???꾩껜 而щ읆 ?꾪꽣瑜??곸슜
+    # 가공용 컬럼 제거 후 리스트 전체 컬럼 필터를 적용
     fixed_exclude = ['index', 'sggCd', 'umdNm', 'jibun', 'buildYear', 'aptSeq', 'umdCd', 'landCd', 'bonbun', 'bubun', 'cdealType', 'cdealDay', 'estateAgengSggNm', 'buerGbn']
     road_exclude = [c for c in filtered_df.columns if str(c).startswith('road')]
     internal_exclude = [c for c in filtered_df.columns if str(c).endswith('_num')]
     all_drop_cols = list(set(fixed_exclude + road_exclude + internal_exclude))
     actual_drop_cols = [c for c in all_drop_cols if c in filtered_df.columns]
 
-    with st.expander("?럾截?Filter Studio", expanded=False):
+    with st.expander("🎛️ Filter Studio", expanded=False):
         h1, h2 = st.columns([0.8, 0.2])
         with h1:
-            st.caption("?꾪꽣???묓옒 ?곹깭濡??좎??⑸땲?? ?꾩슂???뚮쭔 ?댁뼱 議곗젙?섏꽭??")
+            st.caption("필터는 접힘 상태로 유지됩니다. 필요할 때만 열어 조정하세요.")
         with h2:
-            if st.button("珥덇린??, use_container_width=True, key=f"btn_reset_{st.session_state.df_nonce}"):
+            if st.button("초기화", use_container_width=True, key=f"btn_reset_{st.session_state.df_nonce}"):
                 reset_filter_state(filter_key_prefix)
                 st.rerun()
 
-        tab_quick, tab_columns = st.tabs(["鍮좊Ⅸ ?꾪꽣", "而щ읆 ?꾪꽣"])
+        tab_quick, tab_columns = st.tabs(["빠른 필터", "컬럼 필터"])
 
         with tab_quick:
             c1, c2 = st.columns(2)
-            if current_type == "留ㅻℓ":
-                if '留ㅻℓ媛_num' in raw_df.columns:
-                    min_v, max_v = int(raw_df['留ㅻℓ媛_num'].min()), int(raw_df['留ㅻℓ媛_num'].max())
+            if current_type == "매매":
+                if '매매가_num' in raw_df.columns:
+                    min_v, max_v = int(raw_df['매매가_num'].min()), int(raw_df['매매가_num'].max())
                     if min_v == max_v:
                         max_v += 1000
 
@@ -1325,55 +1345,55 @@ if st.session_state.df is not None:
                     default_val = (max(min_v, default_val[0]), min(max_v, default_val[1]))
 
                     with c1:
-                        deal_sel = st.slider("?뮥 留ㅻℓ媛 (留뚯썝)", min_v, max_v, default_val, step=1000, key="slider_deal")
+                        deal_sel = st.slider("💰 매매가 (만원)", min_v, max_v, default_val, step=1000, key="slider_deal")
                         st.session_state.filter_deal_price = deal_sel
                         if deal_sel[0] > min_v or deal_sel[1] < max_v:
                             quick_filter_active_count += 1
-                        filtered_df = filtered_df[filtered_df['留ㅻℓ媛_num'].between(deal_sel[0], deal_sel[1])]
+                        filtered_df = filtered_df[filtered_df['매매가_num'].between(deal_sel[0], deal_sel[1])]
             else:
                 with c1:
-                    if '蹂댁쬆湲?num' in raw_df.columns:
-                        min_v, max_v = int(raw_df['蹂댁쬆湲?num'].min()), int(raw_df['蹂댁쬆湲?num'].max())
+                    if '보증금_num' in raw_df.columns:
+                        min_v, max_v = int(raw_df['보증금_num'].min()), int(raw_df['보증금_num'].max())
                         if min_v == max_v:
                             max_v += 100
 
                         default_val = st.session_state.filter_dep_price if st.session_state.filter_dep_price else (min_v, max_v)
                         default_val = (max(min_v, default_val[0]), min(max_v, default_val[1]))
 
-                        dep_sel = st.slider("?뮥 蹂댁쬆湲?(留뚯썝)", min_v, max_v, default_val, step=500, key="slider_dep")
+                        dep_sel = st.slider("💰 보증금 (만원)", min_v, max_v, default_val, step=500, key="slider_dep")
                         st.session_state.filter_dep_price = dep_sel
                         if dep_sel[0] > min_v or dep_sel[1] < max_v:
                             quick_filter_active_count += 1
-                        filtered_df = filtered_df[filtered_df['蹂댁쬆湲?num'].between(dep_sel[0], dep_sel[1])]
+                        filtered_df = filtered_df[filtered_df['보증금_num'].between(dep_sel[0], dep_sel[1])]
 
                 with c2:
-                    if '?붿꽭_num' in raw_df.columns:
-                        min_v, max_v = int(raw_df['?붿꽭_num'].min()), int(raw_df['?붿꽭_num'].max())
+                    if '월세_num' in raw_df.columns:
+                        min_v, max_v = int(raw_df['월세_num'].min()), int(raw_df['월세_num'].max())
                         if min_v == max_v:
                             max_v += 10
 
                         default_val = st.session_state.filter_rent_price if st.session_state.filter_rent_price else (min_v, max_v)
                         default_val = (max(min_v, default_val[0]), min(max_v, default_val[1]))
 
-                        rent_sel = st.slider("?뮫 ?붿꽭 (留뚯썝)", min_v, max_v, default_val, step=10, key="slider_rent")
+                        rent_sel = st.slider("💵 월세 (만원)", min_v, max_v, default_val, step=10, key="slider_rent")
                         st.session_state.filter_rent_price = rent_sel
                         if rent_sel[0] > min_v or rent_sel[1] < max_v:
                             quick_filter_active_count += 1
-                        filtered_df = filtered_df[filtered_df['?붿꽭_num'].between(rent_sel[0], rent_sel[1])]
+                        filtered_df = filtered_df[filtered_df['월세_num'].between(rent_sel[0], rent_sel[1])]
 
             c3, c4 = st.columns(2)
-            if '?꾩슜硫댁쟻_num' in raw_df.columns:
+            if '전용면적_num' in raw_df.columns:
                 with c3:
                     area_unit = st.radio(
-                        "?뱪 硫댁쟻 湲곗?",
-                        options=["怨듦툒硫댁쟻(?됲삎?)", "?꾩슜硫댁쟻(??"],
+                        "📐 면적 기준",
+                        options=["공급면적(평형대)", "전용면적(㎡)"],
                         horizontal=True,
                         key="quick_area_unit"
                     )
                     st.session_state.filter_area_unit = area_unit
 
-                    if area_unit == "怨듦툒硫댁쟻(?됲삎?)":
-                        area_series = filtered_df['?꾩슜硫댁쟻_num'].apply(to_supply_pyeong_band)
+                    if area_unit == "공급면적(평형대)":
+                        area_series = filtered_df['전용면적_num'].apply(to_supply_pyeong_band)
                         band_order = [label for _, label in SUPPLY_PYEONG_BANDS]
                         options = [b for b in band_order if b in area_series.dropna().unique().tolist()]
 
@@ -1382,28 +1402,28 @@ if st.session_state.df is not None:
                         if not default_bands:
                             default_bands = options
 
-                        sel_bands = st.multiselect("怨듦툒?됲삎? ?좏깮", options=options, default=default_bands, key="ms_supply_bands")
+                        sel_bands = st.multiselect("공급평형대 선택", options=options, default=default_bands, key="ms_supply_bands")
                         st.session_state.filter_supply_bands = sel_bands
                         st.session_state.filter_areas = []
                         if len(sel_bands) != len(options):
                             quick_filter_active_count += 1
                         filtered_df = filtered_df[area_series.isin(sel_bands)]
                     else:
-                        area_list = sorted(filtered_df['?꾩슜硫댁쟻_num'].unique())
+                        area_list = sorted(filtered_df['전용면적_num'].unique())
                         default_areas = st.session_state.filter_areas if st.session_state.filter_areas else area_list
                         default_areas = [a for a in default_areas if a in area_list]
                         if not default_areas:
                             default_areas = area_list
 
-                        sel_areas = st.multiselect("?꾩슜硫댁쟻 (??", options=area_list, default=default_areas, key="ms_areas")
+                        sel_areas = st.multiselect("전용면적 (㎡)", options=area_list, default=default_areas, key="ms_areas")
                         st.session_state.filter_areas = sel_areas
                         st.session_state.filter_supply_bands = []
                         if len(sel_areas) != len(area_list):
                             quick_filter_active_count += 1
-                        filtered_df = filtered_df[filtered_df['?꾩슜硫댁쟻_num'].isin(sel_areas)]
+                        filtered_df = filtered_df[filtered_df['전용면적_num'].isin(sel_areas)]
 
-            if '痢?num' in raw_df.columns:
-                floor_list = sorted(raw_df['痢?num'].unique().astype(int))
+            if '층_num' in raw_df.columns:
+                floor_list = sorted(raw_df['층_num'].unique().astype(int))
 
                 default_floors = st.session_state.filter_floors if st.session_state.filter_floors else floor_list
                 default_floors = [f for f in default_floors if f in floor_list]
@@ -1411,7 +1431,7 @@ if st.session_state.df is not None:
                     default_floors = floor_list
 
                 with c4:
-                    st.markdown("?룫 痢듭닔 ?좏깮")
+                    st.markdown("🏢 층수 선택")
 
                     for floor in floor_list:
                         floor_key = f"{filter_key_prefix}_floor_{floor}"
@@ -1419,8 +1439,8 @@ if st.session_state.df is not None:
                             st.session_state[floor_key] = floor in default_floors
 
                     btn_col1, btn_col2 = st.columns(2)
-                    select_all_floors = btn_col1.button("?꾩껜 ?좏깮", key=f"{filter_key_prefix}_floor_select_all", use_container_width=True)
-                    clear_all_floors = btn_col2.button("?꾩껜 ?댁젣", key=f"{filter_key_prefix}_floor_clear_all", use_container_width=True)
+                    select_all_floors = btn_col1.button("전체 선택", key=f"{filter_key_prefix}_floor_select_all", use_container_width=True)
+                    clear_all_floors = btn_col2.button("전체 해제", key=f"{filter_key_prefix}_floor_clear_all", use_container_width=True)
 
                     if select_all_floors:
                         for floor in floor_list:
@@ -1433,14 +1453,14 @@ if st.session_state.df is not None:
                     sel_floors = []
                     for idx, floor in enumerate(floor_list):
                         with floor_cols[idx % 3]:
-                            is_checked = st.checkbox(f"{floor}痢?, key=f"{filter_key_prefix}_floor_{floor}")
+                            is_checked = st.checkbox(f"{floor}층", key=f"{filter_key_prefix}_floor_{floor}")
                         if is_checked:
                             sel_floors.append(floor)
 
                     st.session_state.filter_floors = sel_floors
                     if len(sel_floors) != len(floor_list):
                         quick_filter_active_count += 1
-                    filtered_df = filtered_df[filtered_df['痢?num'].isin(sel_floors)]
+                    filtered_df = filtered_df[filtered_df['층_num'].isin(sel_floors)]
 
         disp_df_base = filtered_df.drop(columns=actual_drop_cols)
         with tab_columns:
@@ -1453,66 +1473,65 @@ if st.session_state.df is not None:
                 <span class="material-icons-outlined" style="font-size:14px;">dashboard_customize</span>
                 Filter Studio
             </div>
-            <div class="filter-stat">?쒖꽦 ?꾪꽣: 鍮좊Ⅸ ?꾪꽣 {quick_filter_active_count}媛?쨌 而щ읆 ?꾪꽣 {col_filter_active_count}媛?쨌 寃곌낵 <b style="color:#0ea5e9;">{len(disp_df):,}嫄?/b></div>
+            <div class="filter-stat">활성 필터: 빠른 필터 {quick_filter_active_count}개 · 컬럼 필터 {col_filter_active_count}개 · 결과 <b style="color:#0ea5e9;">{len(disp_df):,}건</b></div>
         </div>
         """,
         unsafe_allow_html=True
     )
 
-    # 由ъ뒪???꾪꽣 寃곌낵 ?몃뜳?ㅻ? ?먮낯 ?꾪꽣 寃곌낵??留ㅽ븨??吏?쒕룄 ?숈씪 湲곗??쇰줈 怨꾩궛
+    # 리스트 필터 결과 인덱스를 원본 필터 결과에 매핑해 지표도 동일 기준으로 계산
     metric_df = filtered_df.loc[disp_df.index] if not disp_df.empty else filtered_df.iloc[0:0]
 
-    # --- ?듭떖 吏??諛??곗씠??異쒕젰 ---
+    # --- 핵심 지표 및 데이터 출력 ---
     if not metric_df.empty:
         m1, m2, m3, m4 = st.columns(4)
         with m1:
-            render_metric_card("珥?嫄곕옒", f"{len(metric_df):,}嫄?, "?꾩옱 ?꾪꽣 寃곌낵", key="metric_total")
+            render_metric_card("총 거래", f"{len(metric_df):,}건", "현재 필터 결과", key="metric_total")
         
-        if current_type == "留ㅻℓ":
-            if '留ㅻℓ媛_num' in metric_df.columns:
+        if current_type == "매매":
+            if '매매가_num' in metric_df.columns:
                 with m2:
-                    render_metric_card("?됯퇏 留ㅻℓ", f"{metric_df['留ㅻℓ媛_num'].mean():,.0f}留?, "嫄곕옒 ?④? ?됯퇏", key="metric_avg_sale")
+                    render_metric_card("평균 매매", f"{metric_df['매매가_num'].mean():,.0f}만", "거래 단가 평균", key="metric_avg_sale")
                 with m3:
-                    render_metric_card("理쒓퀬 留ㅻℓ", f"{metric_df['留ㅻℓ媛_num'].max():,.0f}留?, "理쒓퀬 泥닿껐 湲덉븸", key="metric_max_sale")
+                    render_metric_card("최고 매매", f"{metric_df['매매가_num'].max():,.0f}만", "최고 체결 금액", key="metric_max_sale")
         else:
-            if '蹂댁쬆湲?num' in metric_df.columns:
+            if '보증금_num' in metric_df.columns:
                 with m2:
-                    render_metric_card("?됯퇏 蹂댁쬆湲?, f"{metric_df['蹂댁쬆湲?num'].mean():,.0f}留?, "蹂댁쬆湲??됯퇏", key="metric_avg_dep")
-            if '?붿꽭_num' in metric_df.columns:
+                    render_metric_card("평균 보증금", f"{metric_df['보증금_num'].mean():,.0f}만", "보증금 평균", key="metric_avg_dep")
+            if '월세_num' in metric_df.columns:
                 with m3:
-                    render_metric_card("?됯퇏 ?붿꽭", f"{metric_df['?붿꽭_num'].mean():,.0f}留?, "?붿꽭 ?됯퇏", key="metric_avg_rent")
+                    render_metric_card("평균 월세", f"{metric_df['월세_num'].mean():,.0f}만", "월세 평균", key="metric_avg_rent")
         
-        if '?꾩슜硫댁쟻_num' in metric_df.columns:
+        if '전용면적_num' in metric_df.columns:
             with m4:
-                render_metric_card("?됯퇏 硫댁쟻", f"{metric_df['?꾩슜硫댁쟻_num'].mean():,.1f}??, "?꾩슜硫댁쟻 ?됯퇏", key="metric_avg_area")
+                render_metric_card("평균 면적", f"{metric_df['전용면적_num'].mean():,.1f}㎡", "전용면적 평균", key="metric_avg_area")
         
         st.divider()
 
-        st.markdown('<div class="chart-card-title"><span class="material-icons-outlined" style="color:#ef4444;">trending_up</span>湲곌컙蹂?嫄곕옒 異붿씠</div>', unsafe_allow_html=True)
-        st.markdown('<div class="chart-sub">?꾩썡??留ㅻℓ 吏?쒖? 嫄곕옒嫄댁닔瑜??④퍡 ?뺤씤?⑸땲??</div>', unsafe_allow_html=True)
+        st.markdown('<div class="chart-card-title"><span class="material-icons-outlined" style="color:#ef4444;">trending_up</span>기간별 거래 추이</div>', unsafe_allow_html=True)
+        st.markdown('<div class="chart-sub">전월세/매매 지표와 거래건수를 함께 확인합니다.</div>', unsafe_allow_html=True)
         render_trade_type_chart(metric_df, current_type)
-        if current_type == "?꾩썡??:
-            st.markdown('<div class="chart-card-title" style="font-size:1.15rem; margin-top:0.9rem;"><span class="material-icons-outlined" style="color:#0ea5e9;">scatter_plot</span>蹂댁쬆湲??붿꽭 Polar Scatter</div>', unsafe_allow_html=True)
+        if current_type == "전월세":
+            st.markdown('<div class="chart-card-title" style="font-size:1.15rem; margin-top:0.9rem;"><span class="material-icons-outlined" style="color:#0ea5e9;">scatter_plot</span>보증금-월세 Polar Scatter</div>', unsafe_allow_html=True)
             render_rental_polar_scatter(metric_df)
         st.divider()
         
-        # 理쒖쥌 由ъ뒪??異쒕젰
-        st.markdown('<div class="chart-card-title" style="font-size:1.15rem;"><span class="material-icons-outlined" style="color:#0ea5e9;">table_chart</span>?ㅺ굅???댁뿭 由ъ뒪??/div>', unsafe_allow_html=True)
+        # 최종 리스트 출력
+        st.markdown('<div class="chart-card-title" style="font-size:1.15rem;"><span class="material-icons-outlined" style="color:#0ea5e9;">table_chart</span>실거래 내역 리스트</div>', unsafe_allow_html=True)
         render_awesome_table(disp_df)
         
-        # ?ㅼ슫濡쒕뱶 踰꾪듉
+        # 다운로드 버튼
         csv = disp_df.to_csv(index=False).encode('utf-8-sig')
-        st.download_button("?뱿 Result CSV Download", data=csv, file_name=f"result_{datetime.datetime.now().strftime('%Y%m%d')}.csv", use_container_width=True)
+        st.download_button("📥 Result CSV Download", data=csv, file_name=f"result_{datetime.datetime.now().strftime('%Y%m%d')}.csv", use_container_width=True)
     else:
-        st.warning("議고쉶???곗씠?곌? ?놁뒿?덈떎. ?꾪꽣 議곌굔??議곗젙??蹂댁꽭??")
+        st.warning("조회된 데이터가 없습니다. 필터 조건을 조정해 보세요.")
 else:
-    # ?湲고솕硫?Hero
+    # 대기화면 Hero
     st.markdown("""
     <div class="hero-container">
         <div class="hero-glow"></div>
         <div class="hero-title">Real Estate Insights</div>
-        <div class="hero-subtitle">?곗씠??湲곕컲 ?꾪뙆???ㅺ굅?섍? 遺꾩꽍 ??쒕낫??/div>
+        <div class="hero-subtitle">데이터 기반 아파트 실거래가 분석 대시보드</div>
     </div>
     """, unsafe_allow_html=True)
-    st.markdown('<div class="main-note">?ъ씠?쒕컮?먯꽌 議고쉶??吏??낵 嫄곕옒 ?좏삎???좏깮??二쇱꽭??</div>', unsafe_allow_html=True)
-
+    st.markdown('<div class="main-note">사이드바에서 조회할 지역과 거래 유형을 선택해 주세요.</div>', unsafe_allow_html=True)
