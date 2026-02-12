@@ -792,6 +792,23 @@ def render_awesome_table(df):
         st.info("표시할 데이터가 없습니다.")
         return
 
+    st.markdown(
+        """
+        <style>
+            .deal-list-table-size + div [data-testid="stDataFrame"] * {
+                font-size: calc(1em - 2pt) !important;
+            }
+            .deal-list-table-size + div table,
+            .deal-list-table-size + div table th,
+            .deal-list-table-size + div table td {
+                font-size: calc(1em - 2pt) !important;
+            }
+        </style>
+        <div class="deal-list-table-size"></div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     safe_df = df.copy().fillna("")
     safe_df.columns = [str(col) for col in safe_df.columns]
     if HAS_AWESOME_TABLE:
