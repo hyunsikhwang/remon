@@ -795,16 +795,28 @@ def render_awesome_table(df):
     st.markdown(
         """
         <style>
-            .deal-list-table-size + div [data-testid="stDataFrame"] * {
-                font-size: calc(1em - 2pt) !important;
+            /* Streamlit dataframe (Glide Data Grid) */
+            [data-testid="stDataFrame"] {
+                --gdg-font-size: 10pt !important;
             }
-            .deal-list-table-size + div table,
-            .deal-list-table-size + div table th,
-            .deal-list-table-size + div table td {
-                font-size: calc(1em - 2pt) !important;
+            [data-testid="stDataFrame"] div,
+            [data-testid="stDataFrame"] span,
+            [data-testid="stDataFrame"] p {
+                font-size: 10pt !important;
+            }
+
+            /* AwesomeTable and generic HTML table fallback */
+            .awesome-table,
+            .awesome-table *,
+            .awesome-table table,
+            .awesome-table th,
+            .awesome-table td,
+            table,
+            table th,
+            table td {
+                font-size: 10pt !important;
             }
         </style>
-        <div class="deal-list-table-size"></div>
         """,
         unsafe_allow_html=True,
     )
