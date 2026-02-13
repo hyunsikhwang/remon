@@ -949,6 +949,22 @@ def render_trade_type_chart(df, trade_type):
             high = round(high + (10 ** (-digits)), digits)
         return low, high
 
+    def build_avg_markline(avg_value, label, color):
+        if avg_value is None or pd.isna(avg_value):
+            return None
+        return opts.MarkLineOpts(
+            symbol=["none", "none"],
+            is_silent=True,
+            linestyle_opts=opts.LineStyleOpts(color=color, width=1.6, type_="dotted"),
+            label_opts=opts.LabelOpts(
+                is_show=True,
+                formatter=f"{label} 평균: {{c}}",
+                color=color,
+                font_size=11,
+            ),
+            data=[opts.MarkLineItem(name=f"{label} 평균", y=round(float(avg_value), 1))],
+        )
+
     if trade_type == "전월세":
         metric_options = []
         if '보증금_num' in base.columns:
@@ -996,6 +1012,19 @@ def render_trade_type_chart(df, trade_type):
     dep_values_all = []
     rent_values_all = []
     combined_dual_axis = trade_type == "전월세" and metric_choice == "보증금+월세"
+    dep_avg_markline = None
+    rent_avg_markline = None
+    single_avg_markline = None
+
+    if combined_dual_axis:
+        dep_avg = pd.to_numeric(base.get('보증금_num'), errors='coerce').mean()
+        rent_avg = pd.to_numeric(base.get('월세_num'), errors='coerce').mean()
+        dep_avg_markline = build_avg_markline(dep_avg, "보증금", "#0369a1")
+        rent_avg_markline = build_avg_markline(rent_avg, "월세", "#c2410c")
+    else:
+        single_avg = pd.to_numeric(base.get(value_col), errors='coerce').mean()
+        single_avg_markline = build_avg_markline(single_avg, metric_choice, "#0f766e")
+
     line = Line()
     line.add_xaxis(x_data)
     if combined_dual_axis:
@@ -1025,6 +1054,7 @@ def render_trade_type_chart(df, trade_type):
                 is_connect_nones=True,
                 label_opts=opts.LabelOpts(is_show=False),
                 linestyle_opts=opts.LineStyleOpts(width=2.4, type_="solid"),
+                markline_opts=dep_avg_markline,
             )
 
         for apt in rent_pivot.columns.tolist():
@@ -1041,6 +1071,7 @@ def render_trade_type_chart(df, trade_type):
                 is_connect_nones=True,
                 label_opts=opts.LabelOpts(is_show=False),
                 linestyle_opts=opts.LineStyleOpts(width=2.0, type_="dashed"),
+                markline_opts=rent_avg_markline,
             )
     else:
         apt_monthly = (
@@ -1061,6 +1092,7 @@ def render_trade_type_chart(df, trade_type):
                 is_connect_nones=True,
                 label_opts=opts.LabelOpts(is_show=False),
                 linestyle_opts=opts.LineStyleOpts(width=2.4, type_="solid"),
+                markline_opts=single_avg_markline,
             )
 
     val_min, val_max = axis_bounds(all_values, 0.12)
@@ -1129,7 +1161,7 @@ def render_trade_type_chart(df, trade_type):
 
     line.overlap(bar)
     title = f"월평균 추세 + 월별 거래건수 ({'전월세' if trade_type == '전월세' else '매매'})"
-    subtitle = f"지표: {metric_choice} · {'아파트별 라인' if multi_apt else '단일 라인'}"
+    subtitle = f"지표: {metric_choice} · {'아파트별 라인' if multi_apt else '단일 라인'} · 기간 평균 가이드 포함"
     line.set_global_opts(
         title_opts=opts.TitleOpts(title=title, subtitle=subtitle),
         tooltip_opts=opts.TooltipOpts(trigger="axis"),
