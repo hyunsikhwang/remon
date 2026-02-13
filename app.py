@@ -1216,6 +1216,7 @@ def estimate_deposit_monthly_equivalent(df):
     return {
         "monthly_per_1000": slope * 1000.0,
         "slope": slope,
+        "intercept": intercept,
         "r2": r2,
         "n": int(len(work)),
     }
@@ -1608,6 +1609,8 @@ if st.session_state.df is not None:
             estimate = estimate_deposit_monthly_equivalent(metric_df)
             if estimate is not None:
                 monthly_per_1000 = estimate["monthly_per_1000"]
+                slope = float(estimate["slope"])
+                intercept = float(estimate["intercept"])
                 direction = "증가" if monthly_per_1000 >= 0 else "감소"
                 st.markdown(
                     f"""
@@ -1618,6 +1621,41 @@ if st.session_state.df is not None:
                     """,
                     unsafe_allow_html=True
                 )
+
+                conv_tab1, conv_tab2 = st.tabs(["보증금 → 월세", "월세 → 보증금"])
+                with conv_tab1:
+                    dep_input = st.number_input(
+                        "보증금 입력 (만원)",
+                        min_value=0.0,
+                        value=80000.0,
+                        step=1000.0,
+                        key="conv_dep_input"
+                    )
+                    est_monthly = intercept + slope * dep_input
+                    st.markdown(
+                        f"<div style='border:1px solid #e2e8f0; border-radius:10px; background:#ffffff; padding:0.7rem 0.85rem; color:#334155; font-size:0.87rem;'>추정 월세: <b>{est_monthly:,.1f}만원</b></div>",
+                        unsafe_allow_html=True
+                    )
+
+                with conv_tab2:
+                    rent_input = st.number_input(
+                        "월세 입력 (만원)",
+                        min_value=0.0,
+                        value=200.0,
+                        step=10.0,
+                        key="conv_rent_input"
+                    )
+                    if abs(slope) < 1e-9:
+                        st.markdown(
+                            "<div style='border:1px solid #e2e8f0; border-radius:10px; background:#ffffff; padding:0.7rem 0.85rem; color:#64748b; font-size:0.86rem;'>기울기가 0에 가까워 보증금 역산이 어렵습니다.</div>",
+                            unsafe_allow_html=True
+                        )
+                    else:
+                        est_deposit = (rent_input - intercept) / slope
+                        st.markdown(
+                            f"<div style='border:1px solid #e2e8f0; border-radius:10px; background:#ffffff; padding:0.7rem 0.85rem; color:#334155; font-size:0.87rem;'>추정 보증금: <b>{est_deposit:,.0f}만원</b></div>",
+                            unsafe_allow_html=True
+                        )
             else:
                 st.markdown(
                     "<div style='border:1px solid #e2e8f0; border-radius:12px; background:#f8fafc; padding:0.75rem 0.9rem; margin:0.55rem 0 0.8rem 0; color:#64748b; font-size:0.85rem;'>환산 추정값을 계산하기 위한 전월세 데이터가 부족합니다.</div>",
