@@ -1180,6 +1180,46 @@ def render_trade_type_chart(df, trade_type):
     )
     st_pyecharts(line, height="500px")
 
+def estimate_deposit_monthly_equivalent(df):
+    """전월세 데이터로 보증금 1000만원당 월세 환산액(선형회귀 기울기 기반) 추정"""
+    if df is None or df.empty:
+        return None
+    if "보증금_num" not in df.columns or "월세_num" not in df.columns:
+        return None
+
+    work = df[["보증금_num", "월세_num"]].copy()
+    work["보증금_num"] = pd.to_numeric(work["보증금_num"], errors="coerce")
+    work["월세_num"] = pd.to_numeric(work["월세_num"], errors="coerce")
+    work = work.dropna()
+    if work.empty or len(work) < 8:
+        return None
+
+    x = work["보증금_num"].astype(float)
+    y = work["월세_num"].astype(float)
+    if x.nunique() < 2:
+        return None
+
+    x_mean = float(x.mean())
+    y_mean = float(y.mean())
+    denom = float(((x - x_mean) ** 2).sum())
+    if denom <= 0:
+        return None
+
+    slope = float(((x - x_mean) * (y - y_mean)).sum() / denom)
+    intercept = y_mean - slope * x_mean
+    y_hat = intercept + slope * x
+
+    ss_res = float(((y - y_hat) ** 2).sum())
+    ss_tot = float(((y - y_mean) ** 2).sum())
+    r2 = 0.0 if ss_tot <= 0 else max(0.0, 1.0 - (ss_res / ss_tot))
+
+    return {
+        "monthly_per_1000": slope * 1000.0,
+        "slope": slope,
+        "r2": r2,
+        "n": int(len(work)),
+    }
+
 def render_rental_polar_scatter(df):
     """전월세 데이터의 보증금-월세 분포를 Polar Scatter로 렌더링"""
     if not HAS_PYECHARTS:
@@ -1564,6 +1604,25 @@ if st.session_state.df is not None:
 
         st.markdown('<div class="chart-card-title"><span class="material-icons-outlined" style="color:#ef4444;">trending_up</span>기간별 거래 추이</div>', unsafe_allow_html=True)
         st.markdown('<div class="chart-sub">전월세/매매 지표와 거래건수를 함께 확인합니다.</div>', unsafe_allow_html=True)
+        if current_type == "전월세":
+            estimate = estimate_deposit_monthly_equivalent(metric_df)
+            if estimate is not None:
+                monthly_per_1000 = estimate["monthly_per_1000"]
+                direction = "증가" if monthly_per_1000 >= 0 else "감소"
+                st.markdown(
+                    f"""
+                    <div style="border:1px solid #e2e8f0; border-radius:12px; background:#f8fafc; padding:0.75rem 0.9rem; margin:0.55rem 0 0.8rem 0; color:#334155; font-size:0.87rem;">
+                        추정 환산: <b>보증금 1,000만원</b> 변화 시 <b>월세 약 {abs(monthly_per_1000):,.1f}만원 {direction}</b>
+                        <span style="color:#64748b;">(현재 필터 기준 선형 추정, 표본 {estimate['n']:,}건, R²={estimate['r2']:.2f})</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            else:
+                st.markdown(
+                    "<div style='border:1px solid #e2e8f0; border-radius:12px; background:#f8fafc; padding:0.75rem 0.9rem; margin:0.55rem 0 0.8rem 0; color:#64748b; font-size:0.85rem;'>환산 추정값을 계산하기 위한 전월세 데이터가 부족합니다.</div>",
+                    unsafe_allow_html=True
+                )
         render_trade_type_chart(metric_df, current_type)
         if current_type == "전월세":
             st.markdown('<div class="chart-card-title" style="font-size:1.15rem; margin-top:0.9rem;"><span class="material-icons-outlined" style="color:#0ea5e9;">scatter_plot</span>보증금-월세 Polar Scatter</div>', unsafe_allow_html=True)
