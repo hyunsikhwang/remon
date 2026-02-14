@@ -965,6 +965,29 @@ def render_trade_type_chart(df, trade_type):
             data=[opts.MarkLineItem(name=f"{label} 평균", y=round(float(avg_value), 1))],
         )
 
+    def calculate_regression_line(y_values):
+        """주어진 값들의 선형 회귀 추세선 값을 계산하여 반환"""
+        indices = [i for i, v in enumerate(y_values) if v is not None and not pd.isna(v)]
+        valid_vals = [float(y_values[i]) for i in indices]
+        
+        if len(indices) < 2:
+            return [None] * len(y_values)
+        
+        n = len(indices)
+        x_sum = sum(indices)
+        y_sum = sum(valid_vals)
+        xy_sum = sum(i * v for i, v in zip(indices, valid_vals))
+        x2_sum = sum(i * i for i in indices)
+        
+        denom = (n * x2_sum - x_sum**2)
+        if denom == 0:
+            return [None] * len(y_values)
+            
+        slope = (n * xy_sum - x_sum * y_sum) / denom
+        intercept = (y_sum - slope * x_sum) / n
+        
+        return [round(slope * i + intercept, 1) for i in range(len(y_values))]
+
     if trade_type == "전월세":
         metric_options = []
         if '보증금_num' in base.columns:
@@ -1073,6 +1096,35 @@ def render_trade_type_chart(df, trade_type):
                 linestyle_opts=opts.LineStyleOpts(width=2.0, type_="dashed"),
                 markline_opts=rent_avg_markline,
             )
+
+        # 추세선 추가
+        dep_avg_monthly = dep_pivot.mean(axis=1).tolist()
+        dep_trend = calculate_regression_line(dep_avg_monthly)
+        line.add_yaxis(
+            "보증금 추세선",
+            dep_trend,
+            yaxis_index=0,
+            is_smooth=True,
+            symbol="none",
+            is_connect_nones=True,
+            label_opts=opts.LabelOpts(is_show=False),
+            linestyle_opts=opts.LineStyleOpts(width=2.8, type_="dotted", color="#0369a1"),
+            itemstyle_opts=opts.ItemStyleOpts(color="#0369a1"),
+        )
+
+        rent_avg_monthly = rent_pivot.mean(axis=1).tolist()
+        rent_trend = calculate_regression_line(rent_avg_monthly)
+        line.add_yaxis(
+            "월세 추세선",
+            rent_trend,
+            yaxis_index=1,
+            is_smooth=True,
+            symbol="none",
+            is_connect_nones=True,
+            label_opts=opts.LabelOpts(is_show=False),
+            linestyle_opts=opts.LineStyleOpts(width=2.5, type_="dotted", color="#c2410c"),
+            itemstyle_opts=opts.ItemStyleOpts(color="#c2410c"),
+        )
     else:
         apt_monthly = (
             base.groupby(['period', '_apt'], as_index=False)
@@ -1094,6 +1146,22 @@ def render_trade_type_chart(df, trade_type):
                 linestyle_opts=opts.LineStyleOpts(width=2.4, type_="solid"),
                 markline_opts=single_avg_markline,
             )
+
+        # 추세선 추가
+        avg_monthly = pivot.mean(axis=1).tolist()
+        trend = calculate_regression_line(avg_monthly)
+        trend_label = f"{metric_choice} 추세선"
+        trend_color = "#ef4444" if trade_type == "매매" else "#0f766e"
+        line.add_yaxis(
+            trend_label,
+            trend,
+            is_smooth=True,
+            symbol="none",
+            is_connect_nones=True,
+            label_opts=opts.LabelOpts(is_show=False),
+            linestyle_opts=opts.LineStyleOpts(width=2.8, type_="dotted", color=trend_color),
+            itemstyle_opts=opts.ItemStyleOpts(color=trend_color),
+        )
 
     val_min, val_max = axis_bounds(all_values, 0.12)
 
@@ -1161,7 +1229,7 @@ def render_trade_type_chart(df, trade_type):
 
     line.overlap(bar)
     title = f"월평균 추세 + 월별 거래건수 ({'전월세' if trade_type == '전월세' else '매매'})"
-    subtitle = f"지표: {metric_choice} · {'아파트별 라인' if multi_apt else '단일 라인'} · 기간 평균 가이드 포함"
+    subtitle = f"지표: {metric_choice} · {'아파트별 라인' if multi_apt else '단일 라인'} · 평균 가이드 및 추세선 포함"
     line.set_global_opts(
         title_opts=opts.TitleOpts(title=title, subtitle=subtitle),
         tooltip_opts=opts.TooltipOpts(trigger="axis"),
