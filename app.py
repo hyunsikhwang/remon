@@ -1300,7 +1300,9 @@ def render_rental_polar_scatter(df):
         st.info("Polar Scatter를 위한 보증금/월세 데이터가 부족합니다.")
         return
 
-    scatter_df = df[["보증금_num", "월세_num"]].dropna().copy()
+    base_cols = ["보증금_num", "월세_num"]
+    date_cols = [c for c in ["년", "월", "일", "deal_date"] if c in df.columns]
+    scatter_df = df[base_cols + date_cols].dropna(subset=base_cols).copy()
     scatter_df = scatter_df[
         (pd.to_numeric(scatter_df["보증금_num"], errors="coerce").notna()) &
         (pd.to_numeric(scatter_df["월세_num"], errors="coerce").notna())
@@ -1311,8 +1313,49 @@ def render_rental_polar_scatter(df):
 
     deposits = scatter_df["보증금_num"].astype(float)
     rents = scatter_df["월세_num"].astype(float)
+    deal_dates = pd.Series(pd.NaT, index=scatter_df.index, dtype="datetime64[ns]")
+    if "deal_date" in scatter_df.columns:
+        deal_dates = pd.to_datetime(scatter_df["deal_date"], errors="coerce")
+    elif "년" in scatter_df.columns and "월" in scatter_df.columns:
+        day_vals = (
+            pd.to_numeric(scatter_df["일"], errors="coerce").fillna(1).astype(int)
+            if "일" in scatter_df.columns
+            else pd.Series(1, index=scatter_df.index)
+        )
+        date_str = (
+            pd.to_numeric(scatter_df["년"], errors="coerce").fillna(0).astype(int).astype(str).str.zfill(4) + "-" +
+            pd.to_numeric(scatter_df["월"], errors="coerce").fillna(0).astype(int).astype(str).str.zfill(2) + "-" +
+            day_vals.astype(str).str.zfill(2)
+        )
+        deal_dates = pd.to_datetime(date_str, errors="coerce")
+
+    valid_dates = deal_dates.dropna()
+    has_valid_dates = not valid_dates.empty
+    if has_valid_dates:
+        min_ord = int(valid_dates.map(lambda d: d.toordinal()).min())
+        max_ord = int(valid_dates.map(lambda d: d.toordinal()).max())
+        span = max_ord - min_ord
+        ordinals = deal_dates.map(lambda d: d.toordinal() if pd.notna(d) else None)
+        if span <= 0:
+            norm_values = ordinals.map(lambda v: 1.0 if v is not None else 0.45)
+        else:
+            norm_values = ordinals.map(
+                lambda v: ((v - min_ord) / span) if v is not None else 0.45
+            )
+        alphas = norm_values.map(lambda v: 0.22 + (0.73 * float(v)))
+    else:
+        alphas = pd.Series(0.72, index=scatter_df.index, dtype=float)
+
     # Polar 좌표는 [radius, angle] 순서이므로 [보증금, 월세]로 전달
-    points = list(zip(deposits.round(1).tolist(), rents.round(1).tolist()))
+    points = []
+    for idx in scatter_df.index:
+        points.append(
+            {
+                "value": [round(float(scatter_df.at[idx, "보증금_num"]), 1), round(float(scatter_df.at[idx, "월세_num"]), 1)],
+                "itemStyle": {"color": f"rgba(15, 118, 110, {float(alphas.loc[idx]):.3f})"},
+                "dealDate": deal_dates.loc[idx].strftime("%Y-%m-%d") if pd.notna(deal_dates.loc[idx]) else "날짜 없음",
+            }
+        )
 
     dep_min, dep_max = float(deposits.min()), float(deposits.max())
     rent_min, rent_max = float(rents.min()), float(rents.max())
@@ -1344,11 +1387,11 @@ def render_rental_polar_scatter(df):
     chart.set_global_opts(
         title_opts=opts.TitleOpts(
             title="보증금-월세 Polar Scatter",
-            subtitle="각 점은 한 건의 전월세 거래를 의미합니다.",
+            subtitle="각 점은 한 건의 전월세 거래를 의미하며, 최근 거래일수록 색이 진합니다.",
         ),
         tooltip_opts=opts.TooltipOpts(
             trigger="item",
-            formatter=JsCode("function (params) { var v = params.value || []; return v[0] + ' / ' + v[1]; }"),
+            formatter=JsCode("function (params) { var v = params.value || []; var d = params.data && params.data.dealDate ? params.data.dealDate : '날짜 없음'; return '보증금: ' + v[0] + '<br/>월세: ' + v[1] + '<br/>거래일: ' + d; }"),
         ),
         legend_opts=opts.LegendOpts(pos_top="4%"),
     )
