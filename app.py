@@ -9,6 +9,7 @@ import os
 import json
 import hashlib
 import html
+from urllib.parse import quote
 try:
     from pyecharts import options as opts
     from pyecharts.charts import Line, Bar, Polar
@@ -506,10 +507,11 @@ def render_recommended_keyword_chips(keywords):
     chip_buttons = []
     for idx, keyword in enumerate(safe_keywords):
         colors = palette[idx % len(palette)]
+        query_href = f'?apt_keyword_pick={quote(keyword)}'
         chip_buttons.append(
-            f'<button class="apt-chip" type="button" '
-            f'style="background:{colors["bg"]};border-color:{colors["border"]};color:{colors["text"]};" '
-            f'onclick="applyKeyword({json.dumps(keyword, ensure_ascii=False)})">{html.escape(keyword)}</button>'
+            f'<a class="apt-chip" target="_top" href="{query_href}" '
+            f'style="background:{colors["bg"]};border-color:{colors["border"]};color:{colors["text"]};">'
+            f'{html.escape(keyword)}</a>'
         )
 
     markup_html = f"""
@@ -537,6 +539,7 @@ def render_recommended_keyword_chips(keywords):
         font-weight: 500;
         white-space: nowrap;
         cursor: pointer;
+        text-decoration: none;
       }}
       .apt-chip:hover {{
         filter: brightness(0.98);
@@ -545,13 +548,6 @@ def render_recommended_keyword_chips(keywords):
     <div class="apt-chip-wrap">
       {"".join(chip_buttons)}
     </div>
-    <script>
-      function applyKeyword(keyword) {{
-        const url = new URL(parent.window.location.href);
-        url.searchParams.set('apt_keyword_pick', keyword);
-        parent.window.location.href = url.toString();
-      }}
-    </script>
     """
     components.html(markup_html, height=component_height, scrolling=False)
 
