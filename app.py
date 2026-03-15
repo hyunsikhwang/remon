@@ -166,6 +166,7 @@ st.markdown("""
     [data-testid="stSidebar"] .stButton > button[data-testid="stBaseButton-secondary"] span {
         font-size: 0.65rem !important;
         line-height: 1.0 !important;
+        white-space: nowrap !important;
     }
     [data-testid="stSidebar"] .stButton > button[data-testid="stBaseButton-secondary"]:hover,
     [data-testid="stSidebar"] .stButton > button[kind="secondary"]:hover {
