@@ -151,12 +151,21 @@ st.markdown("""
         box-shadow: none !important;
         padding: 0.08rem 0.2rem !important;
         min-height: 1.15rem !important;
-        font-size: 0.48rem !important;
+        font-size: 0.65rem !important;
         line-height: 1.0 !important;
         font-weight: 500 !important;
         border-radius: 999px !important;
         border: 1px solid #dbe4ee !important;
         color: #334155 !important;
+    }
+    [data-testid="stSidebar"] .stButton > button[kind="secondary"] p,
+    [data-testid="stSidebar"] .stButton > button[data-testid="stBaseButton-secondary"] p,
+    [data-testid="stSidebar"] .stButton > button[kind="secondary"] div,
+    [data-testid="stSidebar"] .stButton > button[data-testid="stBaseButton-secondary"] div,
+    [data-testid="stSidebar"] .stButton > button[kind="secondary"] span,
+    [data-testid="stSidebar"] .stButton > button[data-testid="stBaseButton-secondary"] span {
+        font-size: 0.65rem !important;
+        line-height: 1.0 !important;
     }
     [data-testid="stSidebar"] .stButton > button[data-testid="stBaseButton-secondary"]:hover,
     [data-testid="stSidebar"] .stButton > button[kind="secondary"]:hover {
