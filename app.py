@@ -175,8 +175,9 @@ st.markdown("""
     [data-testid="stSidebar"] div:has(> .apt-btn-item-marker) {
         display: inline-block !important;
         width: auto !important;
-        margin-right: 0.2rem !important;
-        margin-bottom: 0.2rem !important;
+        margin-right: -0.5rem !important; /* 가로 간격 밀착 */
+        margin-bottom: -1rem !important; /* 세로 간격 밀착 (Streamlit 기본 block 여백 상쇄) */
+        padding: 0 !important;
     }
 
     [data-testid="stSidebar"] .stButton > button[kind="secondary"] p,
