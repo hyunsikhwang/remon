@@ -146,6 +146,23 @@ st.markdown("""
         border-color: #1e293b;
     }
 
+    [data-testid="stSidebar"] .stButton > button[kind="secondary"] {
+        background: #f8fafc;
+        color: #334155;
+        border: 1px solid #e2e8f0;
+        box-shadow: none;
+        padding: 0.35rem 0.55rem;
+        min-height: 2rem;
+        font-size: 0.76rem;
+        font-weight: 600;
+        border-radius: 999px;
+    }
+    [data-testid="stSidebar"] .stButton > button[kind="secondary"]:hover {
+        background: #f1f5f9;
+        border-color: #cbd5e1;
+        color: #0f172a;
+    }
+
     [data-testid="stVerticalBlockBorderWrapper"] {
         border: 1px solid #f1f5f9 !important;
         border-radius: 1rem !important;
@@ -360,6 +377,7 @@ if "filter_area_unit" not in st.session_state: st.session_state.filter_area_unit
 if "filter_supply_bands" not in st.session_state: st.session_state.filter_supply_bands = []
 
 USER_PREFS_PATH = os.path.join(os.path.dirname(__file__), ".user_prefs.json")
+MAX_APT_SEARCH_TERMS = 8
 
 def get_user_pref_key():
     """헤더/쿠키 기반 사용자 식별 키 생성"""
@@ -421,6 +439,96 @@ def save_user_preferences(user_key, prefs):
     except Exception:
         pass
 
+def normalize_keyword_term(value):
+    return re.sub(r"\s+", " ", str(value or "")).strip()
+
+def merge_keyword_history(existing_terms, keyword):
+    """검색어 빈도/최종 사용시각을 누적"""
+    normalized = normalize_keyword_term(keyword)
+    cleaned_terms = []
+    for item in existing_terms or []:
+        if not isinstance(item, dict):
+            continue
+        term = normalize_keyword_term(item.get("keyword"))
+        if not term:
+            continue
+        count = item.get("count", 0)
+        last_used_at = str(item.get("last_used_at", ""))
+        cleaned_terms.append({
+            "keyword": term,
+            "count": int(count) if str(count).isdigit() else 0,
+            "last_used_at": last_used_at,
+        })
+
+    if not normalized:
+        return cleaned_terms[:MAX_APT_SEARCH_TERMS]
+
+    now_text = datetime.datetime.now().isoformat(timespec="seconds")
+    updated = False
+    for item in cleaned_terms:
+        if item["keyword"] == normalized:
+            item["count"] += 1
+            item["last_used_at"] = now_text
+            updated = True
+            break
+
+    if not updated:
+        cleaned_terms.append({
+            "keyword": normalized,
+            "count": 1,
+            "last_used_at": now_text,
+        })
+
+    cleaned_terms.sort(
+        key=lambda item: (
+            -int(item.get("count", 0)),
+            str(item.get("last_used_at", "")),
+            item.get("keyword", ""),
+        ),
+        reverse=False,
+    )
+    cleaned_terms.sort(
+        key=lambda item: (
+            int(item.get("count", 0)),
+            str(item.get("last_used_at", "")),
+        ),
+        reverse=True,
+    )
+    return cleaned_terms[:MAX_APT_SEARCH_TERMS]
+
+def get_recommended_keywords(existing_terms):
+    return [
+        item["keyword"]
+        for item in (existing_terms or [])
+        if isinstance(item, dict) and normalize_keyword_term(item.get("keyword"))
+    ][:MAX_APT_SEARCH_TERMS]
+
+def persist_current_user_preferences(include_keyword_history=False):
+    prefs = load_user_preferences(st.session_state.user_pref_key)
+    apt_keyword = normalize_keyword_term(st.session_state.get("apt_keyword_input", ""))
+    existing_history = prefs.get("apt_keyword_history", st.session_state.get("apt_keyword_history", []))
+    if include_keyword_history:
+        history = merge_keyword_history(existing_history, apt_keyword)
+    else:
+        history = existing_history
+
+    st.session_state.apt_keyword_history = history
+    save_user_preferences(
+        st.session_state.user_pref_key,
+        {
+            "trade_type": st.session_state.get("trade_type_val", "전월세"),
+            "region_input": normalize_keyword_term(st.session_state.get("region_input_text", "")),
+            "start_date": st.session_state.get("start_date_input").isoformat() if isinstance(st.session_state.get("start_date_input"), datetime.date) else "",
+            "end_date": st.session_state.get("end_date_input").isoformat() if isinstance(st.session_state.get("end_date_input"), datetime.date) else "",
+            "apt_keyword": apt_keyword,
+            "apt_keyword_history": history,
+        }
+    )
+
+def apply_recommended_keyword(keyword):
+    st.session_state.apt_keyword_input = keyword
+    persist_current_user_preferences(include_keyword_history=False)
+
 def parse_date_or_fallback(value, fallback):
     try:
         if isinstance(value, datetime.date):
@@ -454,7 +562,10 @@ if "inputs_restored" not in st.session_state:
         today_for_init
     )
     st.session_state.apt_keyword_input = restored.get("apt_keyword", "")
+    st.session_state.apt_keyword_history = restored.get("apt_keyword_history", [])
     st.session_state.inputs_restored = True
+if "apt_keyword_history" not in st.session_state:
+    st.session_state.apt_keyword_history = []
 
 @st.cache_resource
 def load_bdong_data():
@@ -1437,22 +1548,32 @@ with st.sidebar:
         help="예시: 래미안&잠실 | 힐스테이트 -리센츠 (AND:& 또는 and, OR:| 또는 or, 제외:-단어/!단어/not 단어)",
         placeholder="예) 래미안&잠실 | 힐스테이트 -리센츠"
     )
+
+    recommended_keywords = [
+        keyword for keyword in get_recommended_keywords(st.session_state.apt_keyword_history)
+        if keyword and keyword != normalize_keyword_term(apt_keyword)
+    ]
+    if recommended_keywords:
+        st.caption("추천 검색어")
+        recommend_cols = st.columns(min(4, len(recommended_keywords)))
+        for idx, keyword in enumerate(recommended_keywords):
+            with recommend_cols[idx % len(recommend_cols)]:
+                st.button(
+                    keyword,
+                    key=f"apt_keyword_recommend_{idx}",
+                    use_container_width=True,
+                    on_click=apply_recommended_keyword,
+                    args=(keyword,),
+                )
     
     st.divider()
     run_query = st.button("데이터 조회 실행", type="primary", use_container_width=True)
 
+persist_current_user_preferences(include_keyword_history=False)
+
 # --- 조회 로직 ---
 if run_query:
-    save_user_preferences(
-        st.session_state.user_pref_key,
-        {
-            "trade_type": trade_type,
-            "region_input": str(region_input).strip(),
-            "start_date": start_date.isoformat() if isinstance(start_date, datetime.date) else "",
-            "end_date": end_date.isoformat() if isinstance(end_date, datetime.date) else "",
-            "apt_keyword": str(apt_keyword).strip(),
-        }
-    )
+    persist_current_user_preferences(include_keyword_history=True)
 
     if not current_key:
         st.error("❗ 서비스키가 설정되지 않았습니다. Secrets 설정 혹은 수동 입력을 확인하세요.")
