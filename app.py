@@ -173,41 +173,47 @@ st.markdown("""
         border-color: #cbd5e1 !important;
         color: #0f172a !important;
     }
+    /* 추천검색어 버튼 (secondary) 다양한 파스텔톤 적용 */
     [data-testid="stSidebar"] .stButton:has(button[data-testid="stBaseButton-secondary"]):nth-of-type(6n+1) button,
     [data-testid="stSidebar"] .stButton:has(button[kind="secondary"]):nth-of-type(6n+1) button {
-        background: #fce7f3 !important;
-        border-color: #f9a8d4 !important;
-        color: #9d174d !important;
+        background: #fdf2f8 !important; /* light pink */
+        border-color: #fbcfe8 !important;
+        color: #831843 !important;
     }
     [data-testid="stSidebar"] .stButton:has(button[data-testid="stBaseButton-secondary"]):nth-of-type(6n+2) button,
     [data-testid="stSidebar"] .stButton:has(button[kind="secondary"]):nth-of-type(6n+2) button {
-        background: #ede9fe !important;
-        border-color: #c4b5fd !important;
-        color: #5b21b6 !important;
+        background: #f0fdf4 !important; /* light green */
+        border-color: #bbf7d0 !important;
+        color: #14532d !important;
     }
     [data-testid="stSidebar"] .stButton:has(button[data-testid="stBaseButton-secondary"]):nth-of-type(6n+3) button,
     [data-testid="stSidebar"] .stButton:has(button[kind="secondary"]):nth-of-type(6n+3) button {
-        background: #e0f2fe !important;
-        border-color: #93c5fd !important;
-        color: #1d4ed8 !important;
+        background: #eff6ff !important; /* light blue */
+        border-color: #bfdbfe !important;
+        color: #1e3a8a !important;
     }
     [data-testid="stSidebar"] .stButton:has(button[data-testid="stBaseButton-secondary"]):nth-of-type(6n+4) button,
     [data-testid="stSidebar"] .stButton:has(button[kind="secondary"]):nth-of-type(6n+4) button {
-        background: #dcfce7 !important;
-        border-color: #86efac !important;
-        color: #166534 !important;
+        background: #fffbeb !important; /* light yellow/amber */
+        border-color: #fde68a !important;
+        color: #78350f !important;
     }
     [data-testid="stSidebar"] .stButton:has(button[data-testid="stBaseButton-secondary"]):nth-of-type(6n+5) button,
     [data-testid="stSidebar"] .stButton:has(button[kind="secondary"]):nth-of-type(6n+5) button {
-        background: #fef3c7 !important;
-        border-color: #fcd34d !important;
-        color: #92400e !important;
+        background: #faf5ff !important; /* light purple */
+        border-color: #e9d5ff !important;
+        color: #4c1d95 !important;
     }
     [data-testid="stSidebar"] .stButton:has(button[data-testid="stBaseButton-secondary"]):nth-of-type(6n) button,
     [data-testid="stSidebar"] .stButton:has(button[kind="secondary"]):nth-of-type(6n) button {
-        background: #ffe4e6 !important;
-        border-color: #fda4af !important;
-        color: #9f1239 !important;
+        background: #fff1f2 !important; /* light rose */
+        border-color: #fecdd3 !important;
+        color: #881337 !important;
+    }
+    /* st.columns gap을 줄였지만 추가적으로 마진 조절 */
+    [data-testid="column"] {
+        padding-left: 0.15rem !important;
+        padding-right: 0.15rem !important;
     }
 
     [data-testid="stVerticalBlockBorderWrapper"] {
@@ -550,8 +556,8 @@ def get_recommended_keywords(existing_terms):
         if isinstance(item, dict) and normalize_keyword_term(item.get("keyword"))
     ][:MAX_APT_SEARCH_TERMS]
 
-def build_recommended_keyword_rows(keywords, row_budget=26):
-    """검색어 길이에 따라 한 줄에 1~3개 정도 배치되도록 행 분할"""
+def build_recommended_keyword_rows(keywords, row_budget=40):
+    """검색어 길이에 따라 한 줄에 여러 개(4~6개 내외) 배치되도록 행 분할"""
     rows = []
     current_row = []
     current_units = 0
@@ -559,7 +565,8 @@ def build_recommended_keyword_rows(keywords, row_budget=26):
         normalized = normalize_keyword_term(keyword)
         if not normalized:
             continue
-        units = max(8, min(len(normalized) + 4, row_budget))
+        # budget을 넉넉히 주어 여러개가 들어가도록 유도 (최소 5, 최대 12 정도)
+        units = max(5, min(len(normalized) + 3, row_budget))
         if current_row and current_units + units > row_budget:
             rows.append(current_row)
             current_row = []
@@ -579,14 +586,15 @@ def apply_recommended_keyword(keyword):
     persist_current_user_preferences(include_keyword_history=True)
 
 def render_recommended_keyword_buttons(keywords):
-    """추천 검색어를 길이에 따라 1~3열 행으로 렌더링"""
+    """추천 검색어를 길이에 따라 여러 행으로 렌더링하고, 색상과 간격을 조정"""
     rows = build_recommended_keyword_rows(keywords)
     if not rows:
         return
 
+    # st.columns의 gap을 "small"로 주어 간격 최소화
     for row_idx, row in enumerate(rows):
-        weights = [max(0.9, min(len(keyword) * 0.48, 7.0)) for keyword in row]
-        cols = st.columns(weights)
+        weights = [max(1.0, len(keyword) * 0.5) for keyword in row]
+        cols = st.columns(weights, gap="small")
         for col_idx, keyword in enumerate(row):
             with cols[col_idx]:
                 st.button(
