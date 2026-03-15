@@ -512,7 +512,7 @@ def render_recommended_keyword_chips(keywords):
             f'onclick="applyKeyword({json.dumps(keyword, ensure_ascii=False)})">{html.escape(keyword)}</button>'
         )
 
-    html = f"""
+    markup_html = f"""
     <style>
       .apt-chip-wrap {{
         display: flex;
@@ -580,7 +580,7 @@ def render_recommended_keyword_chips(keywords):
       }}
     </script>
     """
-    components.html(html, height=component_height, scrolling=False)
+    components.html(markup_html, height=component_height, scrolling=False)
 
 def persist_current_user_preferences(include_keyword_history=False):
     prefs = load_user_preferences(st.session_state.user_pref_key)
