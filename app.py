@@ -174,39 +174,33 @@ st.markdown("""
         border-color: #cbd5e1 !important;
         color: #0f172a !important;
     }
-    /* 추천검색어 버튼 (secondary) 다양한 파스텔톤 적용 */
-    [data-testid="stSidebar"] .stButton:has(button[data-testid="stBaseButton-secondary"]):nth-of-type(6n+1) button,
-    [data-testid="stSidebar"] .stButton:has(button[kind="secondary"]):nth-of-type(6n+1) button {
+    /* 추천검색어 버튼 (secondary) 다양한 파스텔톤 적용 - Span Anchor + Sibling Selector */
+    div:has(.apt-btn-color-0) + div .stButton > button {
         background: #fdf2f8 !important; /* light pink */
         border-color: #fbcfe8 !important;
         color: #831843 !important;
     }
-    [data-testid="stSidebar"] .stButton:has(button[data-testid="stBaseButton-secondary"]):nth-of-type(6n+2) button,
-    [data-testid="stSidebar"] .stButton:has(button[kind="secondary"]):nth-of-type(6n+2) button {
+    div:has(.apt-btn-color-1) + div .stButton > button {
         background: #f0fdf4 !important; /* light green */
         border-color: #bbf7d0 !important;
         color: #14532d !important;
     }
-    [data-testid="stSidebar"] .stButton:has(button[data-testid="stBaseButton-secondary"]):nth-of-type(6n+3) button,
-    [data-testid="stSidebar"] .stButton:has(button[kind="secondary"]):nth-of-type(6n+3) button {
+    div:has(.apt-btn-color-2) + div .stButton > button {
         background: #eff6ff !important; /* light blue */
         border-color: #bfdbfe !important;
         color: #1e3a8a !important;
     }
-    [data-testid="stSidebar"] .stButton:has(button[data-testid="stBaseButton-secondary"]):nth-of-type(6n+4) button,
-    [data-testid="stSidebar"] .stButton:has(button[kind="secondary"]):nth-of-type(6n+4) button {
+    div:has(.apt-btn-color-3) + div .stButton > button {
         background: #fffbeb !important; /* light yellow/amber */
         border-color: #fde68a !important;
         color: #78350f !important;
     }
-    [data-testid="stSidebar"] .stButton:has(button[data-testid="stBaseButton-secondary"]):nth-of-type(6n+5) button,
-    [data-testid="stSidebar"] .stButton:has(button[kind="secondary"]):nth-of-type(6n+5) button {
+    div:has(.apt-btn-color-4) + div .stButton > button {
         background: #faf5ff !important; /* light purple */
         border-color: #e9d5ff !important;
         color: #4c1d95 !important;
     }
-    [data-testid="stSidebar"] .stButton:has(button[data-testid="stBaseButton-secondary"]):nth-of-type(6n) button,
-    [data-testid="stSidebar"] .stButton:has(button[kind="secondary"]):nth-of-type(6n) button {
+    div:has(.apt-btn-color-5) + div .stButton > button {
         background: #fff1f2 !important; /* light rose */
         border-color: #fecdd3 !important;
         color: #881337 !important;
@@ -593,11 +587,15 @@ def render_recommended_keyword_buttons(keywords):
         return
 
     # st.columns의 gap을 "small"로 주어 간격 최소화
+    color_counter = 0
     for row_idx, row in enumerate(rows):
         weights = [max(1.0, len(keyword) * 0.5) for keyword in row]
         cols = st.columns(weights, gap="small")
         for col_idx, keyword in enumerate(row):
             with cols[col_idx]:
+                css_class = f"apt-btn-color-{color_counter % 6}"
+                color_counter += 1
+                st.markdown(f'<span class="{css_class}" style="display:none;"></span>', unsafe_allow_html=True)
                 st.button(
                     keyword,
                     key=f"apt_keyword_recommend_btn_{row_idx}_{col_idx}_{keyword}",
