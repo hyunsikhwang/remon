@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 from PublicDataReader import TransactionPrice, code_bdong
 import datetime
@@ -144,26 +145,6 @@ st.markdown("""
     .stButton > button:hover, button[kind="primary"]:hover {
         background: #1e293b;
         border-color: #1e293b;
-    }
-
-    [data-testid="stSidebar"] .stButton > button[kind="secondary"],
-    [data-testid="stSidebar"] .stButton > button[data-testid="stBaseButton-secondary"] {
-        background: #f8fafc;
-        color: #334155;
-        border: 1px solid #e2e8f0;
-        box-shadow: none;
-        padding: 0.14rem 0.38rem !important;
-        min-height: 1.45rem !important;
-        font-size: 0.62rem !important;
-        line-height: 1.1 !important;
-        font-weight: 500 !important;
-        border-radius: 999px !important;
-    }
-    [data-testid="stSidebar"] .stButton > button[kind="secondary"]:hover,
-    [data-testid="stSidebar"] .stButton > button[data-testid="stBaseButton-secondary"]:hover {
-        background: #f1f5f9;
-        border-color: #cbd5e1;
-        color: #0f172a;
     }
 
     [data-testid="stVerticalBlockBorderWrapper"] {
@@ -506,6 +487,86 @@ def get_recommended_keywords(existing_terms):
         if isinstance(item, dict) and normalize_keyword_term(item.get("keyword"))
     ][:MAX_APT_SEARCH_TERMS]
 
+def render_recommended_keyword_chips(keywords):
+    """추천 검색어를 길이에 따라 자동 줄바꿈되는 클릭형 칩으로 표시"""
+    safe_keywords = [normalize_keyword_term(keyword) for keyword in keywords if normalize_keyword_term(keyword)]
+    if not safe_keywords:
+        return
+    estimated_rows = max(1, math.ceil(sum(max(len(keyword), 6) for keyword in safe_keywords) / 26))
+    component_height = min(140, 30 + (estimated_rows * 24))
+
+    html = f"""
+    <style>
+      .apt-chip-wrap {{
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.36rem;
+        align-items: flex-start;
+        padding-top: 0.1rem;
+      }}
+      .apt-chip {{
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        max-width: 100%;
+        width: auto;
+        padding: 0.14rem 0.42rem;
+        border-radius: 999px;
+        border: 1px solid #dbe4ee;
+        background: #f8fafc;
+        color: #334155;
+        font-size: 10px;
+        line-height: 1.1;
+        font-weight: 500;
+        white-space: nowrap;
+        cursor: pointer;
+      }}
+      .apt-chip:hover {{
+        background: #f1f5f9;
+        border-color: #cbd5e1;
+        color: #0f172a;
+      }}
+    </style>
+    <div class="apt-chip-wrap">
+      {"".join(f'<button class="apt-chip" type="button" onclick="applyKeyword({json.dumps(keyword, ensure_ascii=False)})">{keyword}</button>' for keyword in safe_keywords)}
+    </div>
+    <script>
+      function findKeywordInput() {{
+        const selectors = [
+          'input[aria-label="아파트명 조건식"]',
+          'input[placeholder*="래미안&잠실"]'
+        ];
+        for (const selector of selectors) {{
+          const el = parent.document.querySelector(selector);
+          if (el) return el;
+        }}
+        const labels = Array.from(parent.document.querySelectorAll('label'));
+        for (const label of labels) {{
+          if ((label.textContent || '').includes('아파트명 조건식')) {{
+            const field = label.parentElement?.querySelector('input');
+            if (field) return field;
+          }}
+        }}
+        return null;
+      }}
+
+      function applyKeyword(keyword) {{
+        const input = findKeywordInput();
+        if (!input) return;
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+        if (setter) {{
+          setter.call(input, keyword);
+        }} else {{
+          input.value = keyword;
+        }}
+        input.dispatchEvent(new Event('input', {{ bubbles: true }}));
+        input.dispatchEvent(new Event('change', {{ bubbles: true }}));
+        input.focus();
+      }}
+    </script>
+    """
+    components.html(html, height=component_height, scrolling=False)
+
 def persist_current_user_preferences(include_keyword_history=False):
     prefs = load_user_preferences(st.session_state.user_pref_key)
     apt_keyword = normalize_keyword_term(st.session_state.get("apt_keyword_input", ""))
@@ -527,10 +588,6 @@ def persist_current_user_preferences(include_keyword_history=False):
             "apt_keyword_history": history,
         }
     )
-
-def apply_recommended_keyword(keyword):
-    st.session_state.apt_keyword_input = keyword
-    persist_current_user_preferences(include_keyword_history=False)
 
 def parse_date_or_fallback(value, fallback):
     try:
@@ -1558,16 +1615,7 @@ with st.sidebar:
     ]
     if recommended_keywords:
         st.caption("추천 검색어")
-        recommend_cols = st.columns(min(4, len(recommended_keywords)))
-        for idx, keyword in enumerate(recommended_keywords):
-            with recommend_cols[idx % len(recommend_cols)]:
-                st.button(
-                    keyword,
-                    key=f"apt_keyword_recommend_{idx}",
-                    use_container_width=False,
-                    on_click=apply_recommended_keyword,
-                    args=(keyword,),
-                )
+        render_recommended_keyword_chips(recommended_keywords)
     
     st.divider()
     run_query = st.button("데이터 조회 실행", type="primary", use_container_width=True)
