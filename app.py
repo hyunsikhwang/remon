@@ -147,6 +147,7 @@ st.markdown("""
     }
 
     [data-testid="stSidebar"] .stButton > button[kind="secondary"],
+    [data-testid="stSidebar"] .stButton > button[kind="secondary"],
     [data-testid="stSidebar"] .stButton > button[data-testid="stBaseButton-secondary"] {
         box-shadow: none !important;
         padding: 0.08rem 0.2rem !important;
@@ -157,6 +158,7 @@ st.markdown("""
         border-radius: 999px !important;
         border: 1px solid #dbe4ee !important;
         color: #334155 !important;
+        overflow: hidden !important;
     }
     [data-testid="stSidebar"] .stButton > button[kind="secondary"] p,
     [data-testid="stSidebar"] .stButton > button[data-testid="stBaseButton-secondary"] p,
@@ -167,6 +169,10 @@ st.markdown("""
         font-size: 0.65rem !important;
         line-height: 1.0 !important;
         white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        max-width: 100% !important;
+        display: block !important;
     }
     [data-testid="stSidebar"] .stButton > button[data-testid="stBaseButton-secondary"]:hover,
     [data-testid="stSidebar"] .stButton > button[kind="secondary"]:hover {
