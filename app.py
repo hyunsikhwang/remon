@@ -546,37 +546,10 @@ def render_recommended_keyword_chips(keywords):
       {"".join(chip_buttons)}
     </div>
     <script>
-      function findKeywordInput() {{
-        const selectors = [
-          'input[aria-label="아파트명 조건식"]',
-          'input[placeholder*="래미안&잠실"]'
-        ];
-        for (const selector of selectors) {{
-          const el = parent.document.querySelector(selector);
-          if (el) return el;
-        }}
-        const labels = Array.from(parent.document.querySelectorAll('label'));
-        for (const label of labels) {{
-          if ((label.textContent || '').includes('아파트명 조건식')) {{
-            const field = label.parentElement?.querySelector('input');
-            if (field) return field;
-          }}
-        }}
-        return null;
-      }}
-
       function applyKeyword(keyword) {{
-        const input = findKeywordInput();
-        if (!input) return;
-        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-        if (setter) {{
-          setter.call(input, keyword);
-        }} else {{
-          input.value = keyword;
-        }}
-        input.dispatchEvent(new Event('input', {{ bubbles: true }}));
-        input.dispatchEvent(new Event('change', {{ bubbles: true }}));
-        input.focus();
+        const url = new URL(parent.window.location.href);
+        url.searchParams.set('apt_keyword_pick', keyword);
+        parent.window.location.href = url.toString();
       }}
     </script>
     """
@@ -619,6 +592,24 @@ def record_apt_keyword_history_once():
     st.session_state.last_recorded_apt_keyword = apt_keyword
     persist_current_user_preferences(include_keyword_history=True)
 
+def apply_picked_keyword_from_query():
+    picked_keyword = normalize_keyword_term(st.query_params.get("apt_keyword_pick", ""))
+    if not picked_keyword:
+        return
+
+    st.session_state.apt_keyword_input = picked_keyword
+    last_recorded = normalize_keyword_term(st.session_state.get("last_recorded_apt_keyword", ""))
+    if picked_keyword != last_recorded:
+        st.session_state.last_recorded_apt_keyword = picked_keyword
+        persist_current_user_preferences(include_keyword_history=True)
+    else:
+        persist_current_user_preferences(include_keyword_history=False)
+
+    try:
+        del st.query_params["apt_keyword_pick"]
+    except Exception:
+        pass
+
 def parse_date_or_fallback(value, fallback):
     try:
         if isinstance(value, datetime.date):
@@ -659,6 +650,8 @@ if "apt_keyword_history" not in st.session_state:
     st.session_state.apt_keyword_history = []
 if "last_recorded_apt_keyword" not in st.session_state:
     st.session_state.last_recorded_apt_keyword = ""
+
+apply_picked_keyword_from_query()
 
 @st.cache_resource
 def load_bdong_data():
