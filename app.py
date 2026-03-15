@@ -8,6 +8,7 @@ import math
 import os
 import json
 import hashlib
+import html
 try:
     from pyecharts import options as opts
     from pyecharts.charts import Line, Bar, Polar
@@ -494,6 +495,22 @@ def render_recommended_keyword_chips(keywords):
         return
     estimated_rows = max(1, math.ceil(sum(max(len(keyword), 6) for keyword in safe_keywords) / 26))
     component_height = min(140, 30 + (estimated_rows * 24))
+    palette = [
+        {"bg": "#fce7f3", "border": "#f9a8d4", "text": "#9d174d"},
+        {"bg": "#ede9fe", "border": "#c4b5fd", "text": "#5b21b6"},
+        {"bg": "#e0f2fe", "border": "#93c5fd", "text": "#1d4ed8"},
+        {"bg": "#dcfce7", "border": "#86efac", "text": "#166534"},
+        {"bg": "#fef3c7", "border": "#fcd34d", "text": "#92400e"},
+        {"bg": "#ffe4e6", "border": "#fda4af", "text": "#9f1239"},
+    ]
+    chip_buttons = []
+    for idx, keyword in enumerate(safe_keywords):
+        colors = palette[idx % len(palette)]
+        chip_buttons.append(
+            f'<button class="apt-chip" type="button" '
+            f'style="background:{colors["bg"]};border-color:{colors["border"]};color:{colors["text"]};" '
+            f'onclick="applyKeyword({json.dumps(keyword, ensure_ascii=False)})">{html.escape(keyword)}</button>'
+        )
 
     html = f"""
     <style>
@@ -522,13 +539,11 @@ def render_recommended_keyword_chips(keywords):
         cursor: pointer;
       }}
       .apt-chip:hover {{
-        background: #f1f5f9;
-        border-color: #cbd5e1;
-        color: #0f172a;
+        filter: brightness(0.98);
       }}
     </style>
     <div class="apt-chip-wrap">
-      {"".join(f'<button class="apt-chip" type="button" onclick="applyKeyword({json.dumps(keyword, ensure_ascii=False)})">{keyword}</button>' for keyword in safe_keywords)}
+      {"".join(chip_buttons)}
     </div>
     <script>
       function findKeywordInput() {{
