@@ -149,10 +149,10 @@ st.markdown("""
     [data-testid="stSidebar"] .stButton > button[kind="secondary"],
     [data-testid="stSidebar"] .stButton > button[data-testid="stBaseButton-secondary"] {
         box-shadow: none !important;
-        padding: 0.18rem 0.42rem !important;
-        min-height: 1.55rem !important;
-        font-size: 0.66rem !important;
-        line-height: 1.1 !important;
+        padding: 0.12rem 0.32rem !important;
+        min-height: 1.35rem !important;
+        font-size: 0.58rem !important;
+        line-height: 1.0 !important;
         font-weight: 500 !important;
         border-radius: 999px !important;
         border: 1px solid #dbe4ee !important;
@@ -576,7 +576,7 @@ def render_recommended_keyword_buttons(keywords):
         return
 
     for row_idx, row in enumerate(rows):
-        weights = [max(1.0, min(len(keyword) * 0.55, 8.0)) for keyword in row]
+        weights = [max(0.9, min(len(keyword) * 0.48, 7.0)) for keyword in row]
         cols = st.columns(weights)
         for col_idx, keyword in enumerate(row):
             with cols[col_idx]:
