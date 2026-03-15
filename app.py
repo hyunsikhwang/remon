@@ -146,15 +146,31 @@ st.markdown("""
         border-color: #1e293b;
     }
 
-    [data-testid="stSidebar"] .stButton > button[kind="secondary"],
-    /* 추천 검색어 컨테이너 (Flex Wrap) 적용 */
-    .apt-btn-flex-container {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.35rem;
-        margin-bottom: 0.5rem;
+    /* ------ 추천 검색어 전용 Flex Row Container ------ */
+    /* Container 마커가 있는 stVerticalBlock 부모를 flex-row + wrap 래퍼로 전환 */
+    [data-testid="stSidebar"] [data-testid="stVerticalBlock"]:has(.apt-btn-container-marker) {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+        gap: 0.35rem 0.25rem !important; /* 상하/좌우 오밀조밀한 간격 통제 */
     }
-    
+
+    /* 마커(빈 래퍼) 자체를 레이아웃에서 완전히 제거 (flex 아이템으로서 공간 차지 방지) */
+    [data-testid="stSidebar"] [data-testid="stVerticalBlock"]:has(.apt-btn-container-marker) > div:has(.apt-btn-item-marker),
+    [data-testid="stSidebar"] [data-testid="stVerticalBlock"]:has(.apt-btn-container-marker) > div:has(.apt-btn-container-marker) {
+        display: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* 버튼 Wrapper가 flex 아이템으로 동작하도록 고정 요소 제거 및 초기화 */
+    [data-testid="stSidebar"] [data-testid="stVerticalBlock"]:has(.apt-btn-container-marker) > div {
+        width: auto !important;
+        flex: 0 0 auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
     [data-testid="stSidebar"] .stButton > button[kind="secondary"],
     [data-testid="stSidebar"] .stButton > button[data-testid="stBaseButton-secondary"] {
         box-shadow: none !important;
@@ -170,14 +186,6 @@ st.markdown("""
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
-    }
-    
-    [data-testid="stSidebar"] div:has(> .apt-btn-item-marker) {
-        display: inline-block !important;
-        width: auto !important;
-        margin-right: -0.5rem !important; /* 가로 간격 밀착 */
-        margin-bottom: -1.2rem !important; /* 세로 간격 극밀착 */
-        padding: 0 !important;
     }
 
     [data-testid="stSidebar"] .stButton > button[kind="secondary"] p,
@@ -607,28 +615,30 @@ def render_recommended_keyword_buttons(keywords):
     if not keywords:
         return
 
-    # st.columns 대신 커스텀 컨테이너 클래스 마커 삽입
-    st.markdown('<div class="apt-btn-flex-container"></div>', unsafe_allow_html=True)
-    
-    color_counter = 0
-    for keyword in keywords:
-        normalized = normalize_keyword_term(keyword)
-        if not normalized:
-            continue
+    # 전용 st.container() 를 생성하여 내부 stVerticalBlock을 flex-row 래퍼로 설정할 수 있게 함
+    with st.container():
+        # 이 컨테이너(stVerticalBlock) 전체를 Flex Row Wrap으로 바꿀 CSS 타겟 마커
+        st.markdown('<span class="apt-btn-container-marker" style="display:none;"></span>', unsafe_allow_html=True)
         
-        css_class = f"apt-btn-color-{color_counter % 6}"
-        color_counter += 1
-        
-        # 버튼을 감싸는 wrapper 역할을 할 투명 span (CSS selector 용도)
-        st.markdown(f'<span class="{css_class} apt-btn-item-marker" style="display:none;"></span>', unsafe_allow_html=True)
-        st.button(
-            normalized,
-            key=f"apt_keyword_recommend_btn_{color_counter}_{normalized}",
-            use_container_width=False,
-            type="secondary",
-            on_click=apply_recommended_keyword,
-            args=(normalized,),
-        )
+        color_counter = 0
+        for keyword in keywords:
+            normalized = normalize_keyword_term(keyword)
+            if not normalized:
+                continue
+            
+            css_class = f"apt-btn-color-{color_counter % 6}"
+            color_counter += 1
+            
+            # 버튼을 감싸는 wrapper 역할을 할 투명 span (CSS selector 용도)
+            st.markdown(f'<span class="{css_class} apt-btn-item-marker" style="display:none;"></span>', unsafe_allow_html=True)
+            st.button(
+                normalized,
+                key=f"apt_keyword_recommend_btn_{color_counter}_{normalized}",
+                use_container_width=False,
+                type="secondary",
+                on_click=apply_recommended_keyword,
+                args=(normalized,),
+            )
 
 def persist_current_user_preferences(include_keyword_history=False):
     prefs = load_user_preferences(st.session_state.user_pref_key)
