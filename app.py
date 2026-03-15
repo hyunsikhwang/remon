@@ -146,18 +146,21 @@ st.markdown("""
         border-color: #1e293b;
     }
 
-    [data-testid="stSidebar"] .stButton > button[kind="secondary"] {
+    [data-testid="stSidebar"] .stButton > button[kind="secondary"],
+    [data-testid="stSidebar"] .stButton > button[data-testid="stBaseButton-secondary"] {
         background: #f8fafc;
         color: #334155;
         border: 1px solid #e2e8f0;
         box-shadow: none;
-        padding: 0.16rem 0.42rem;
-        min-height: 1.55rem;
-        font-size: 0.68rem;
-        font-weight: 500;
-        border-radius: 999px;
+        padding: 0.14rem 0.38rem !important;
+        min-height: 1.45rem !important;
+        font-size: 0.62rem !important;
+        line-height: 1.1 !important;
+        font-weight: 500 !important;
+        border-radius: 999px !important;
     }
-    [data-testid="stSidebar"] .stButton > button[kind="secondary"]:hover {
+    [data-testid="stSidebar"] .stButton > button[kind="secondary"]:hover,
+    [data-testid="stSidebar"] .stButton > button[data-testid="stBaseButton-secondary"]:hover {
         background: #f1f5f9;
         border-color: #cbd5e1;
         color: #0f172a;
