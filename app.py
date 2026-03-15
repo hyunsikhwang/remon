@@ -1645,7 +1645,7 @@ with st.sidebar:
 
     recommended_keywords = [
         keyword for keyword in get_recommended_keywords(st.session_state.apt_keyword_history)
-        if keyword and keyword != normalize_keyword_term(apt_keyword)
+        if keyword
     ]
     if recommended_keywords:
         st.caption("추천 검색어")
