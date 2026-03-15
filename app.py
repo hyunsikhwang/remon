@@ -149,9 +149,9 @@ st.markdown("""
     [data-testid="stSidebar"] .stButton > button[kind="secondary"],
     [data-testid="stSidebar"] .stButton > button[data-testid="stBaseButton-secondary"] {
         box-shadow: none !important;
-        padding: 0.12rem 0.32rem !important;
-        min-height: 1.35rem !important;
-        font-size: 0.58rem !important;
+        padding: 0.08rem 0.2rem !important;
+        min-height: 1.15rem !important;
+        font-size: 0.48rem !important;
         line-height: 1.0 !important;
         font-weight: 500 !important;
         border-radius: 999px !important;
