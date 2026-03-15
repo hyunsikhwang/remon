@@ -176,7 +176,7 @@ st.markdown("""
         display: inline-block !important;
         width: auto !important;
         margin-right: -0.5rem !important; /* 가로 간격 밀착 */
-        margin-bottom: -1rem !important; /* 세로 간격 밀착 (Streamlit 기본 block 여백 상쇄) */
+        margin-bottom: -1.2rem !important; /* 세로 간격 극밀착 */
         padding: 0 !important;
     }
 
