@@ -601,8 +601,23 @@ def persist_current_user_preferences(include_keyword_history=False):
             "end_date": st.session_state.get("end_date_input").isoformat() if isinstance(st.session_state.get("end_date_input"), datetime.date) else "",
             "apt_keyword": apt_keyword,
             "apt_keyword_history": history,
+            "last_recorded_apt_keyword": normalize_keyword_term(st.session_state.get("last_recorded_apt_keyword", "")),
         }
     )
+
+def record_apt_keyword_history_once():
+    apt_keyword = normalize_keyword_term(st.session_state.get("apt_keyword_input", ""))
+    if not apt_keyword:
+        persist_current_user_preferences(include_keyword_history=False)
+        return
+
+    last_recorded = normalize_keyword_term(st.session_state.get("last_recorded_apt_keyword", ""))
+    if apt_keyword == last_recorded:
+        persist_current_user_preferences(include_keyword_history=False)
+        return
+
+    st.session_state.last_recorded_apt_keyword = apt_keyword
+    persist_current_user_preferences(include_keyword_history=True)
 
 def parse_date_or_fallback(value, fallback):
     try:
@@ -638,9 +653,12 @@ if "inputs_restored" not in st.session_state:
     )
     st.session_state.apt_keyword_input = restored.get("apt_keyword", "")
     st.session_state.apt_keyword_history = restored.get("apt_keyword_history", [])
+    st.session_state.last_recorded_apt_keyword = restored.get("last_recorded_apt_keyword", "")
     st.session_state.inputs_restored = True
 if "apt_keyword_history" not in st.session_state:
     st.session_state.apt_keyword_history = []
+if "last_recorded_apt_keyword" not in st.session_state:
+    st.session_state.last_recorded_apt_keyword = ""
 
 @st.cache_resource
 def load_bdong_data():
@@ -1620,6 +1638,7 @@ with st.sidebar:
     apt_keyword = st.text_input(
         "아파트명 조건식",
         key="apt_keyword_input",
+        on_change=record_apt_keyword_history_once,
         help="예시: 래미안&잠실 | 힐스테이트 -리센츠 (AND:& 또는 and, OR:| 또는 or, 제외:-단어/!단어/not 단어)",
         placeholder="예) 래미안&잠실 | 힐스테이트 -리센츠"
     )
@@ -1639,6 +1658,7 @@ persist_current_user_preferences(include_keyword_history=False)
 
 # --- 조회 로직 ---
 if run_query:
+    st.session_state.last_recorded_apt_keyword = normalize_keyword_term(st.session_state.get("apt_keyword_input", ""))
     persist_current_user_preferences(include_keyword_history=True)
 
     if not current_key:
