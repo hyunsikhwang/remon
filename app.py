@@ -147,10 +147,18 @@ st.markdown("""
     }
 
     [data-testid="stSidebar"] .stButton > button[kind="secondary"],
+    /* 추천 검색어 컨테이너 (Flex Wrap) 적용 */
+    .apt-btn-flex-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        margin-bottom: 0.5rem;
+    }
+    
     [data-testid="stSidebar"] .stButton > button[kind="secondary"],
     [data-testid="stSidebar"] .stButton > button[data-testid="stBaseButton-secondary"] {
         box-shadow: none !important;
-        padding: 0.08rem 0.2rem !important;
+        padding: 0.15rem 0.35rem !important;
         min-height: 1.15rem !important;
         font-size: 0.65rem !important;
         line-height: 1.0 !important;
@@ -158,8 +166,19 @@ st.markdown("""
         border-radius: 999px !important;
         border: 1px solid #dbe4ee !important;
         color: #334155 !important;
-        overflow: hidden !important;
+        width: auto !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
+    
+    [data-testid="stSidebar"] div:has(> .apt-btn-item-marker) {
+        display: inline-block !important;
+        width: auto !important;
+        margin-right: 0.2rem !important;
+        margin-bottom: 0.2rem !important;
+    }
+
     [data-testid="stSidebar"] .stButton > button[kind="secondary"] p,
     [data-testid="stSidebar"] .stButton > button[data-testid="stBaseButton-secondary"] p,
     [data-testid="stSidebar"] .stButton > button[kind="secondary"] div,
@@ -169,10 +188,6 @@ st.markdown("""
         font-size: 0.65rem !important;
         line-height: 1.0 !important;
         white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        max-width: 100% !important;
-        display: block !important;
     }
     [data-testid="stSidebar"] .stButton > button[data-testid="stBaseButton-secondary"]:hover,
     [data-testid="stSidebar"] .stButton > button[kind="secondary"]:hover {
@@ -588,28 +603,31 @@ def apply_recommended_keyword(keyword):
 
 def render_recommended_keyword_buttons(keywords):
     """추천 검색어를 길이에 따라 여러 행으로 렌더링하고, 색상과 간격을 조정"""
-    rows = build_recommended_keyword_rows(keywords)
-    if not rows:
+    if not keywords:
         return
 
-    # st.columns의 gap을 "small"로 주어 간격 최소화
+    # st.columns 대신 커스텀 컨테이너 클래스 마커 삽입
+    st.markdown('<div class="apt-btn-flex-container"></div>', unsafe_allow_html=True)
+    
     color_counter = 0
-    for row_idx, row in enumerate(rows):
-        weights = [max(1.0, len(keyword) * 0.5) for keyword in row]
-        cols = st.columns(weights, gap="small")
-        for col_idx, keyword in enumerate(row):
-            with cols[col_idx]:
-                css_class = f"apt-btn-color-{color_counter % 6}"
-                color_counter += 1
-                st.markdown(f'<span class="{css_class}" style="display:none;"></span>', unsafe_allow_html=True)
-                st.button(
-                    keyword,
-                    key=f"apt_keyword_recommend_btn_{row_idx}_{col_idx}_{keyword}",
-                    use_container_width=True,
-                    type="secondary",
-                    on_click=apply_recommended_keyword,
-                    args=(keyword,),
-                )
+    for keyword in keywords:
+        normalized = normalize_keyword_term(keyword)
+        if not normalized:
+            continue
+        
+        css_class = f"apt-btn-color-{color_counter % 6}"
+        color_counter += 1
+        
+        # 버튼을 감싸는 wrapper 역할을 할 투명 span (CSS selector 용도)
+        st.markdown(f'<span class="{css_class} apt-btn-item-marker" style="display:none;"></span>', unsafe_allow_html=True)
+        st.button(
+            normalized,
+            key=f"apt_keyword_recommend_btn_{color_counter}_{normalized}",
+            use_container_width=False,
+            type="secondary",
+            on_click=apply_recommended_keyword,
+            args=(normalized,),
+        )
 
 def persist_current_user_preferences(include_keyword_history=False):
     prefs = load_user_preferences(st.session_state.user_pref_key)
