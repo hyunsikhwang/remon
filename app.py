@@ -151,10 +151,10 @@ st.markdown("""
         color: #334155;
         border: 1px solid #e2e8f0;
         box-shadow: none;
-        padding: 0.35rem 0.55rem;
-        min-height: 2rem;
-        font-size: 0.76rem;
-        font-weight: 600;
+        padding: 0.16rem 0.42rem;
+        min-height: 1.55rem;
+        font-size: 0.68rem;
+        font-weight: 500;
         border-radius: 999px;
     }
     [data-testid="stSidebar"] .stButton > button[kind="secondary"]:hover {
@@ -1561,7 +1561,7 @@ with st.sidebar:
                 st.button(
                     keyword,
                     key=f"apt_keyword_recommend_{idx}",
-                    use_container_width=True,
+                    use_container_width=False,
                     on_click=apply_recommended_keyword,
                     args=(keyword,),
                 )
