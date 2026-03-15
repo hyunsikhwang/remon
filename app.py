@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 from PublicDataReader import TransactionPrice, code_bdong
 import datetime
@@ -8,8 +7,6 @@ import math
 import os
 import json
 import hashlib
-import html
-from urllib.parse import quote
 try:
     from pyecharts import options as opts
     from pyecharts.charts import Line, Bar, Polar
@@ -147,6 +144,61 @@ st.markdown("""
     .stButton > button:hover, button[kind="primary"]:hover {
         background: #1e293b;
         border-color: #1e293b;
+    }
+
+    [data-testid="stSidebar"] .stButton > button[kind="secondary"],
+    [data-testid="stSidebar"] .stButton > button[data-testid="stBaseButton-secondary"] {
+        box-shadow: none !important;
+        padding: 0.18rem 0.42rem !important;
+        min-height: 1.55rem !important;
+        font-size: 0.66rem !important;
+        line-height: 1.1 !important;
+        font-weight: 500 !important;
+        border-radius: 999px !important;
+        border: 1px solid #dbe4ee !important;
+        color: #334155 !important;
+    }
+    [data-testid="stSidebar"] .stButton > button[data-testid="stBaseButton-secondary"]:hover,
+    [data-testid="stSidebar"] .stButton > button[kind="secondary"]:hover {
+        filter: brightness(0.98);
+        border-color: #cbd5e1 !important;
+        color: #0f172a !important;
+    }
+    [data-testid="stSidebar"] .stButton:has(button[data-testid="stBaseButton-secondary"]):nth-of-type(6n+1) button,
+    [data-testid="stSidebar"] .stButton:has(button[kind="secondary"]):nth-of-type(6n+1) button {
+        background: #fce7f3 !important;
+        border-color: #f9a8d4 !important;
+        color: #9d174d !important;
+    }
+    [data-testid="stSidebar"] .stButton:has(button[data-testid="stBaseButton-secondary"]):nth-of-type(6n+2) button,
+    [data-testid="stSidebar"] .stButton:has(button[kind="secondary"]):nth-of-type(6n+2) button {
+        background: #ede9fe !important;
+        border-color: #c4b5fd !important;
+        color: #5b21b6 !important;
+    }
+    [data-testid="stSidebar"] .stButton:has(button[data-testid="stBaseButton-secondary"]):nth-of-type(6n+3) button,
+    [data-testid="stSidebar"] .stButton:has(button[kind="secondary"]):nth-of-type(6n+3) button {
+        background: #e0f2fe !important;
+        border-color: #93c5fd !important;
+        color: #1d4ed8 !important;
+    }
+    [data-testid="stSidebar"] .stButton:has(button[data-testid="stBaseButton-secondary"]):nth-of-type(6n+4) button,
+    [data-testid="stSidebar"] .stButton:has(button[kind="secondary"]):nth-of-type(6n+4) button {
+        background: #dcfce7 !important;
+        border-color: #86efac !important;
+        color: #166534 !important;
+    }
+    [data-testid="stSidebar"] .stButton:has(button[data-testid="stBaseButton-secondary"]):nth-of-type(6n+5) button,
+    [data-testid="stSidebar"] .stButton:has(button[kind="secondary"]):nth-of-type(6n+5) button {
+        background: #fef3c7 !important;
+        border-color: #fcd34d !important;
+        color: #92400e !important;
+    }
+    [data-testid="stSidebar"] .stButton:has(button[data-testid="stBaseButton-secondary"]):nth-of-type(6n) button,
+    [data-testid="stSidebar"] .stButton:has(button[kind="secondary"]):nth-of-type(6n) button {
+        background: #ffe4e6 !important;
+        border-color: #fda4af !important;
+        color: #9f1239 !important;
     }
 
     [data-testid="stVerticalBlockBorderWrapper"] {
@@ -489,67 +541,53 @@ def get_recommended_keywords(existing_terms):
         if isinstance(item, dict) and normalize_keyword_term(item.get("keyword"))
     ][:MAX_APT_SEARCH_TERMS]
 
-def render_recommended_keyword_chips(keywords):
-    """추천 검색어를 길이에 따라 자동 줄바꿈되는 클릭형 칩으로 표시"""
-    safe_keywords = [normalize_keyword_term(keyword) for keyword in keywords if normalize_keyword_term(keyword)]
-    if not safe_keywords:
-        return
-    estimated_rows = max(1, math.ceil(sum(max(len(keyword), 6) for keyword in safe_keywords) / 26))
-    component_height = min(140, 30 + (estimated_rows * 24))
-    palette = [
-        {"bg": "#fce7f3", "border": "#f9a8d4", "text": "#9d174d"},
-        {"bg": "#ede9fe", "border": "#c4b5fd", "text": "#5b21b6"},
-        {"bg": "#e0f2fe", "border": "#93c5fd", "text": "#1d4ed8"},
-        {"bg": "#dcfce7", "border": "#86efac", "text": "#166534"},
-        {"bg": "#fef3c7", "border": "#fcd34d", "text": "#92400e"},
-        {"bg": "#ffe4e6", "border": "#fda4af", "text": "#9f1239"},
-    ]
-    chip_buttons = []
-    for idx, keyword in enumerate(safe_keywords):
-        colors = palette[idx % len(palette)]
-        query_href = f'?apt_keyword_pick={quote(keyword)}'
-        chip_buttons.append(
-            f'<a class="apt-chip" target="_top" href="{query_href}" '
-            f'style="background:{colors["bg"]};border-color:{colors["border"]};color:{colors["text"]};">'
-            f'{html.escape(keyword)}</a>'
-        )
+def build_recommended_keyword_rows(keywords, row_budget=26):
+    """검색어 길이에 따라 한 줄에 1~3개 정도 배치되도록 행 분할"""
+    rows = []
+    current_row = []
+    current_units = 0
+    for keyword in keywords:
+        normalized = normalize_keyword_term(keyword)
+        if not normalized:
+            continue
+        units = max(8, min(len(normalized) + 4, row_budget))
+        if current_row and current_units + units > row_budget:
+            rows.append(current_row)
+            current_row = []
+            current_units = 0
+        current_row.append(normalized)
+        current_units += units
+    if current_row:
+        rows.append(current_row)
+    return rows
 
-    markup_html = f"""
-    <style>
-      .apt-chip-wrap {{
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.36rem;
-        align-items: flex-start;
-        padding-top: 0.1rem;
-      }}
-      .apt-chip {{
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        max-width: 100%;
-        width: auto;
-        padding: 0.14rem 0.42rem;
-        border-radius: 999px;
-        border: 1px solid #dbe4ee;
-        background: #f8fafc;
-        color: #334155;
-        font-size: 10px;
-        line-height: 1.1;
-        font-weight: 500;
-        white-space: nowrap;
-        cursor: pointer;
-        text-decoration: none;
-      }}
-      .apt-chip:hover {{
-        filter: brightness(0.98);
-      }}
-    </style>
-    <div class="apt-chip-wrap">
-      {"".join(chip_buttons)}
-    </div>
-    """
-    components.html(markup_html, height=component_height, scrolling=False)
+def apply_recommended_keyword(keyword):
+    normalized = normalize_keyword_term(keyword)
+    if not normalized:
+        return
+    st.session_state.apt_keyword_input = normalized
+    st.session_state.last_recorded_apt_keyword = normalized
+    persist_current_user_preferences(include_keyword_history=True)
+
+def render_recommended_keyword_buttons(keywords):
+    """추천 검색어를 길이에 따라 1~3열 행으로 렌더링"""
+    rows = build_recommended_keyword_rows(keywords)
+    if not rows:
+        return
+
+    for row_idx, row in enumerate(rows):
+        weights = [max(1.0, min(len(keyword) * 0.55, 8.0)) for keyword in row]
+        cols = st.columns(weights)
+        for col_idx, keyword in enumerate(row):
+            with cols[col_idx]:
+                st.button(
+                    keyword,
+                    key=f"apt_keyword_recommend_btn_{row_idx}_{col_idx}_{keyword}",
+                    use_container_width=True,
+                    type="secondary",
+                    on_click=apply_recommended_keyword,
+                    args=(keyword,),
+                )
 
 def persist_current_user_preferences(include_keyword_history=False):
     prefs = load_user_preferences(st.session_state.user_pref_key)
@@ -587,24 +625,6 @@ def record_apt_keyword_history_once():
 
     st.session_state.last_recorded_apt_keyword = apt_keyword
     persist_current_user_preferences(include_keyword_history=True)
-
-def apply_picked_keyword_from_query():
-    picked_keyword = normalize_keyword_term(st.query_params.get("apt_keyword_pick", ""))
-    if not picked_keyword:
-        return
-
-    st.session_state.apt_keyword_input = picked_keyword
-    last_recorded = normalize_keyword_term(st.session_state.get("last_recorded_apt_keyword", ""))
-    if picked_keyword != last_recorded:
-        st.session_state.last_recorded_apt_keyword = picked_keyword
-        persist_current_user_preferences(include_keyword_history=True)
-    else:
-        persist_current_user_preferences(include_keyword_history=False)
-
-    try:
-        del st.query_params["apt_keyword_pick"]
-    except Exception:
-        pass
 
 def parse_date_or_fallback(value, fallback):
     try:
@@ -646,8 +666,6 @@ if "apt_keyword_history" not in st.session_state:
     st.session_state.apt_keyword_history = []
 if "last_recorded_apt_keyword" not in st.session_state:
     st.session_state.last_recorded_apt_keyword = ""
-
-apply_picked_keyword_from_query()
 
 @st.cache_resource
 def load_bdong_data():
@@ -1638,7 +1656,7 @@ with st.sidebar:
     ]
     if recommended_keywords:
         st.caption("추천 검색어")
-        render_recommended_keyword_chips(recommended_keywords)
+        render_recommended_keyword_buttons(recommended_keywords)
     
     st.divider()
     run_query = st.button("데이터 조회 실행", type="primary", use_container_width=True)
