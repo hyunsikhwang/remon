@@ -6,6 +6,8 @@
 - [x] 기간별 거래 추이 차트의 타이틀/legend 간격 확인
 - [x] 기간별 거래 추이 차트 상단 여백 조정
 - [x] 검증 및 커밋/푸시
+- [x] `grid_opts` 인자 TypeError 원인 확인
+- [x] pyecharts 버전 호환 grid 설정으로 변경
 
 ## Review
 - 원인: `PublicDataReader` 내부에서 pandas 월말 주기 별칭 `m`을 사용하고, pandas 3에서는 이 별칭이 제거되어 `ME` 사용을 요구함.
@@ -27,3 +29,7 @@
 - 검증: `python3 -m py_compile app.py` 통과.
 - 제한: 로컬 Python 환경에 `pyecharts`가 없어 실제 차트 렌더링 재현은 미실행.
 - 테스트: 표준 테스트 설정 파일이 없어 미실행.
+
+## Review 2026-04-19 Grid Compat
+- 원인: 배포 환경의 pyecharts `Line.set_global_opts()`가 `grid_opts` 인자를 지원하지 않아 `TypeError`가 발생함.
+- 조치: `grid_opts` 인자를 제거하고 `line.options["grid"]`에 ECharts grid 설정을 직접 적용함.

@@ -1533,7 +1533,6 @@ def render_trade_type_chart(df, trade_type):
         ),
         tooltip_opts=opts.TooltipOpts(trigger="axis"),
         legend_opts=opts.LegendOpts(pos_top="14%", type_="scroll"),
-        grid_opts=opts.GridOpts(pos_top="26%", pos_bottom="18%"),
         xaxis_opts=opts.AxisOpts(type_="category", boundary_gap=False),
         yaxis_opts=opts.AxisOpts(
             name="보증금(만원)" if combined_dual_axis else y_axis_name,
@@ -1546,6 +1545,7 @@ def render_trade_type_chart(df, trade_type):
             opts.DataZoomOpts(type_="slider", range_start=0, range_end=100)
         ],
     )
+    line.options["grid"] = [{"top": "26%", "bottom": "18%"}]
     st_pyecharts(line, height="500px")
 
 def estimate_deposit_monthly_equivalent(df):
