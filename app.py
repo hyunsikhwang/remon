@@ -11,7 +11,6 @@ from contextlib import contextmanager
 try:
     from pyecharts import options as opts
     from pyecharts.charts import Line, Bar, Polar
-    from pyecharts.commons.utils import JsCode
     from streamlit_echarts import st_pyecharts
     HAS_PYECHARTS = True
 except ModuleNotFoundError:
@@ -19,7 +18,6 @@ except ModuleNotFoundError:
     Line = None
     Bar = None
     Polar = None
-    JsCode = None
     st_pyecharts = None
     HAS_PYECHARTS = False
 
@@ -1642,14 +1640,18 @@ def render_rental_polar_scatter(df):
     else:
         alphas = pd.Series(0.72, index=scatter_df.index, dtype=float)
 
-    # Polar 좌표는 [radius, angle] 순서이므로 [보증금, 월세]로 전달
+    # Polar 좌표는 [radius, angle] 순서이므로 [보증금, 월세]를 앞에 둔다.
     points = []
     for idx in scatter_df.index:
+        deal_date = deal_dates.loc[idx].strftime("%Y-%m-%d") if pd.notna(deal_dates.loc[idx]) else "날짜 없음"
         points.append(
             {
-                "value": [round(float(scatter_df.at[idx, "보증금_num"]), 1), round(float(scatter_df.at[idx, "월세_num"]), 1)],
+                "value": [
+                    round(float(scatter_df.at[idx, "보증금_num"]), 1),
+                    round(float(scatter_df.at[idx, "월세_num"]), 1),
+                    deal_date,
+                ],
                 "itemStyle": {"color": f"rgba(15, 118, 110, {float(alphas.loc[idx]):.3f})"},
-                "dealDate": deal_dates.loc[idx].strftime("%Y-%m-%d") if pd.notna(deal_dates.loc[idx]) else "날짜 없음",
             }
         )
 
@@ -1687,7 +1689,7 @@ def render_rental_polar_scatter(df):
         ),
         tooltip_opts=opts.TooltipOpts(
             trigger="item",
-            formatter=JsCode("function (params) { var v = params.value || []; var d = params.data && params.data.dealDate ? params.data.dealDate : '날짜 없음'; return '보증금: ' + v[0] + '<br/>월세: ' + v[1] + '<br/>거래일: ' + d; }"),
+            formatter="보증금: {@[0]}<br/>월세: {@[1]}<br/>거래일: {@[2]}",
         ),
         legend_opts=opts.LegendOpts(pos_top="4%"),
     )
