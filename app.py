@@ -7,6 +7,7 @@ import math
 import os
 import json
 import hashlib
+from contextlib import contextmanager
 try:
     from pyecharts import options as opts
     from pyecharts.charts import Line, Bar, Polar
@@ -46,6 +47,39 @@ except ImportError:
     except Exception:
         AwesomeTable = None
         HAS_AWESOME_TABLE = False
+
+
+@contextmanager
+def pandas_month_end_frequency_compat():
+    """PublicDataReader의 구형 월말 주기 별칭을 pandas 3에서 보정한다."""
+    original_date_range = pd.date_range
+
+    def date_range_compat(*args, **kwargs):
+        try:
+            return original_date_range(*args, **kwargs)
+        except ValueError as exc:
+            freq = kwargs.get("freq")
+            args_list = list(args)
+            if freq is None and len(args_list) >= 4:
+                freq = args_list[3]
+
+            if str(freq) not in {"m", "M"} or "ME" not in str(exc):
+                raise
+
+            if "freq" in kwargs:
+                kwargs = {**kwargs, "freq": "ME"}
+            elif len(args_list) >= 4:
+                args_list[3] = "ME"
+            else:
+                kwargs = {**kwargs, "freq": "ME"}
+
+            return original_date_range(*args_list, **kwargs)
+
+    pd.date_range = date_range_compat
+    try:
+        yield
+    finally:
+        pd.date_range = original_date_range
 
 # --- 페이지 설정 ---
 st.set_page_config(
@@ -1730,13 +1764,14 @@ if run_query:
             else:
                 try:
                     api = TransactionPrice(current_key)
-                    df = api.get_data(
-                        property_type="아파트",
-                        trade_type=trade_type,
-                        sigungu_code=sigungu_code,
-                        start_year_month=start_ym,
-                        end_year_month=end_ym
-                    )
+                    with pandas_month_end_frequency_compat():
+                        df = api.get_data(
+                            property_type="아파트",
+                            trade_type=trade_type,
+                            sigungu_code=sigungu_code,
+                            start_year_month=start_ym,
+                            end_year_month=end_ym
+                        )
                     
                     if df is not None and not df.empty:
                         df = standardize_columns(df)
