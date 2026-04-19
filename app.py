@@ -1525,9 +1525,15 @@ def render_trade_type_chart(df, trade_type):
     title = f"월평균 추세 + 월별 거래건수 ({'전월세' if trade_type == '전월세' else '매매'})"
     subtitle = f"지표: {metric_choice} · {'아파트별 라인' if multi_apt else '단일 라인'} · 평균 가이드 및 추세선 포함"
     line.set_global_opts(
-        title_opts=opts.TitleOpts(title=title, subtitle=subtitle),
+        title_opts=opts.TitleOpts(
+            title=title,
+            subtitle=subtitle,
+            pos_top="0%",
+            item_gap=8,
+        ),
         tooltip_opts=opts.TooltipOpts(trigger="axis"),
-        legend_opts=opts.LegendOpts(pos_top="4%", type_="scroll"),
+        legend_opts=opts.LegendOpts(pos_top="14%", type_="scroll"),
+        grid_opts=opts.GridOpts(pos_top="26%", pos_bottom="18%"),
         xaxis_opts=opts.AxisOpts(type_="category", boundary_gap=False),
         yaxis_opts=opts.AxisOpts(
             name="보증금(만원)" if combined_dual_axis else y_axis_name,
